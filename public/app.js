@@ -109,9 +109,11 @@
     for (let offset=34; offset>=0; offset--) {
       const date = new Date(today.getFullYear(),today.getMonth(),today.getDate()-offset);
       const count = counts.get(dayKey(date)) || 0;
-      const cell = el('span','calendar-cell level-' + Math.min(count,4));
+      const cell = el('button','calendar-cell level-' + Math.min(count,4));
+      cell.type = 'button';
       cell.title = dayKey(date) + ' · ' + count + ' 条笔记';
       cell.setAttribute('aria-label',cell.title);
+      cell.addEventListener('click', () => { $('calendarDayDetail').textContent = cell.title; });
       box.append(cell);
     }
   }
