@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  document.body.classList.toggle('linote-android', /LinoteAndroid\/\d+/.test(navigator.userAgent));
   const KEY = 'linote.notes.v1';
   const ACCOUNT_KEY = 'linote.account.v1';
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
