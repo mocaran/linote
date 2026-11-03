@@ -1,9 +1,15 @@
 (() => {
   'use strict';
   const KEY = 'linote.notes.v1';
+  const ACCOUNT_KEY = 'linote.account.v1';
+  const MIGRATION_KEY = 'linote.legacy-migrated.v1';
   const $ = id => document.getElementById(id);
-  const state = { notes: readNotes(), tag: null, search: '', sort: 'desc', editing: null, draftTags: [] };
+  const state = { notes: [], account: readAccount(), tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [] };
   let toastTimer;
+
+  function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
+  function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
+  function readAccount() { try { const value = normalizeAccount(localStorage.getItem(ACCOUNT_KEY) || ''); return validAccount(value) ? value : null; } catch { return null; } }
 
   function readNotes() {
     try {
@@ -12,15 +18,28 @@
     } catch { return []; }
   }
   async function api(method, payload, id) {
-    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers: payload === undefined ? {} : {'Content-Type':'application/json'}, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store'});
+    if (!state.account) throw new Error('请先输入笔记编号');
+    const headers = {'X-Linote-Account':encodeURIComponent(state.account)};
+    if (payload !== undefined) headers['Content-Type'] = 'application/json';
+    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store'});
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '同步失败');
     return response.json();
   }
   async function loadFromAccount() {
+    if (!state.account) return;
+    const account = state.account;
     try {
+      if (localStorage.getItem(MIGRATION_KEY) !== 'done') {
+        const migrated = await fetch('/api/notes/migrate-legacy', {method:'POST',headers:{'X-Linote-Account':encodeURIComponent(account)},cache:'no-store'});
+        if (migrated.ok) {
+          const result = await migrated.json();
+          if (result.available) localStorage.setItem(MIGRATION_KEY, 'done');
+        }
+      }
       const oldNotes = readNotes();
       if (oldNotes.length) await api('PUT', oldNotes);
       const data = await api('GET');
+      if (state.account !== account) return;
       state.notes = data.notes;
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
@@ -51,6 +70,7 @@
   }
   function setTag(tag) {
     state.tag = tag;
+    state.reviewIds = null;
     $('searchInput').value = '';
     state.search = '';
     closeSidebar();
@@ -63,7 +83,8 @@
   }
   function renderSidebar() {
     $('allCount').textContent = state.notes.length;
-    $('allNotes').classList.toggle('active', state.tag === null);
+    $('allNotes').classList.toggle('active', state.tag === null && state.reviewIds === null);
+    $('reviewNotes').classList.toggle('active', state.reviewIds !== null);
     $('sortButton').textContent = state.sort === 'desc' ? '笔记数 ↓' : '笔记数 ↑';
     const list = $('topicList'); list.replaceChildren();
     const tags = sortedTags();
@@ -95,16 +116,19 @@
     }
   }
   function filteredNotes() {
+    if (state.reviewIds !== null) return state.reviewIds.map(id => state.notes.find(n => n.id === id)).filter(Boolean);
     const q = state.search.trim().toLocaleLowerCase();
     return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || n.body.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
   }
   function renderNotes() {
     const notes = filteredNotes();
-    const title = state.tag ? '#' + state.tag : '全部笔记';
+    const title = state.reviewIds !== null ? '随机回顾' : state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
     $('resultCount').textContent = notes.length + ' 条笔记';
-    $('filterLabel').textContent = state.search ? '搜索结果' : '按最近编辑排序';
-    $('clearFilter').hidden = !state.tag && !state.search;
+    $('filterLabel').textContent = state.reviewIds !== null ? '从全部笔记中随机抽取' : state.search ? '搜索结果' : '按最近编辑排序';
+    $('reviewAgain').hidden = state.reviewIds === null;
+    $('clearFilter').hidden = !state.tag && !state.search && state.reviewIds === null;
+    $('clearFilter').textContent = state.reviewIds !== null ? '退出回顾 ×' : '清除筛选 ×';
     const list = $('notes'); list.replaceChildren();
     notes.forEach(note => {
       const card = el('article', 'note');
@@ -122,11 +146,22 @@
       list.append(card);
     });
     $('empty').hidden = notes.length > 0;
-    $('emptyTitle').textContent = state.search ? '没有找到匹配的笔记' : state.tag ? '这个话题还没有笔记' : '从一条笔记开始';
-    $('emptyText').textContent = state.search ? '试试其他关键词或清除筛选。' : state.tag ? '写下新想法，并添加这个话题。' : '把稍纵即逝的想法留在这里。';
-    $('emptyNew').textContent = state.search ? '清除搜索 ↗' : '写一条笔记 ↗';
+    $('emptyNew').textContent = state.search || state.reviewIds !== null ? '查看全部笔记 ↗' : '写一条笔记 ↗';
   }
   function render() { renderSidebar(); renderNotes(); }
+  function chooseReview() {
+    const ids = state.notes.map(n => n.id);
+    const previous = state.reviewIds;
+    for (let i=ids.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
+    let next = ids.slice(0,10);
+    if (previous && ids.length > 10 && previous.length === 10 && next.every(id => previous.includes(id))) {
+      const outside = ids.find(id => !previous.includes(id));
+      if (outside) next[9] = outside;
+    } else if (previous && next.length > 1 && next.every((id,i) => id === previous[i])) next = [...next.slice(1),next[0]];
+    state.reviewIds = next;
+    state.tag = null; state.search = ''; $('searchInput').value = '';
+    closeSidebar(); render();
+  }
   function normalizeTag(raw) { return raw.trim().replace(/^#+/, '').replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').replace(/^\/|\/$/g, '').slice(0,60); }
   function addTag(raw) {
     const tag = normalizeTag(raw);
@@ -167,6 +202,7 @@
     if (!confirm('确定删除这条笔记吗？')) return;
     try { await api('DELETE', undefined, id); } catch (error) { toast(error.message || '删除失败'); return; }
     state.notes = state.notes.filter(n => n.id !== id);
+    if (state.reviewIds) state.reviewIds = state.reviewIds.filter(noteId => noteId !== id);
     if (state.tag && !tagCounts().has(state.tag)) state.tag = null;
     render(); toast('笔记已删除');
   }
@@ -186,6 +222,7 @@
     try { await api('POST', note); } catch (error) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
     $('saveNote').disabled = false;
     state.notes = [note, ...state.notes.filter(n => n.id !== note.id)];
+    state.reviewIds = null;
     closeEditor(); render(); toast('笔记已保存');
   }
   function exportNotes() {
@@ -194,11 +231,27 @@
     link.href = url; link.download = 'linote-' + new Date().toISOString().slice(0,10) + '.json'; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  ['newNoteSidebar','newNoteTop','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && state.search) { state.search = ''; $('searchInput').value = ''; render(); } else openEditor(); }));
+  ['newNoteSidebar','newNoteTop','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
   $('allNotes').addEventListener('click', () => setTag(null));
+  $('reviewNotes').addEventListener('click', chooseReview);
+  $('reviewAgain').addEventListener('click', chooseReview);
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
-  $('searchInput').addEventListener('input', e => { state.search = e.target.value; renderNotes(); });
-  $('clearFilter').addEventListener('click', () => { state.tag = null; state.search = ''; $('searchInput').value = ''; render(); });
+  $('searchInput').addEventListener('input', e => { state.reviewIds = null; state.search = e.target.value; render(); });
+  $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
+  $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
+  document.addEventListener('click', e => { if (!$('calendarPanel').hidden && !$('calendarPanel').contains(e.target) && !$('calendarToggle').contains(e.target)) { $('calendarPanel').hidden = true; $('calendarToggle').setAttribute('aria-expanded','false'); } });
+  function openAccount() { $('accountInput').value = state.account || ''; $('accountError').textContent = ''; $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
+  $('switchAccount').addEventListener('click', openAccount);
+  $('accountForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const account = normalizeAccount($('accountInput').value);
+    if (!validAccount(account)) { $('accountError').textContent = '请输入 1 至 32 个字符的编号'; return; }
+    state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
+    localStorage.setItem(ACCOUNT_KEY, account);
+    $('accountName').textContent = account;
+    $('accountLayer').hidden = true;
+    closeSidebar(); render(); await loadFromAccount();
+  });
   function openSidebar() { $('sidebar').classList.add('open'); $('mobileShade').hidden = false; }
   function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
   $('mobileMenu').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
@@ -225,5 +278,6 @@
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
-  loadFromAccount();
+  if (state.account) { $('accountName').textContent = state.account; loadFromAccount(); }
+  else openAccount();
 })();

@@ -1,0 +1,16 @@
+.calendar-toggle{width:100%;height:42px;margin-top:9px;padding:0 12px;display:flex;align-items:center;gap:8px;border:1px solid #e9e5e5;border-radius:8px;background:#fff;color:#555;text-align:left;font-size:13px}
+.calendar-toggle:hover,.calendar-toggle[aria-expanded="true"]{background:#fff5f4;border-color:#e8caca;color:#b54444}
+.calendar-toggle>span{font-size:16px;color:#b66a6a}.calendar-toggle small{margin-left:auto;color:#a88a8a;font-size:10px}
+.mini-stats{margin:8px 0 0;box-shadow:0 8px 22px #0000000b}.mini-stats-title strong{color:#999}.mini-calendar{margin-bottom:2px}
+.side-section{margin-top:17px}.nav-item .nav-icon{min-width:20px;text-align:center}
+.feed-actions{display:flex;align-items:center;gap:12px}.feed-actions button{border:0;background:none;color:#b64b4b;font-size:12px;padding:5px}
+.empty{display:flex;align-items:center;justify-content:flex-start;min-height:0;padding:12px 0;border:0;border-radius:0;background:transparent}.empty button{margin:0}
+.account-layer{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:18px;background:#20202066;backdrop-filter:blur(3px)}
+.account-dialog{width:min(390px,100%);padding:29px;background:#fff;border-radius:12px;box-shadow:0 24px 80px #0002}
+.account-dialog h2{margin:0 0 11px;font-size:21px;font-weight:650}.account-dialog p{margin:0;color:#777;font-size:13px;line-height:1.6}
+.account-dialog form{display:flex;flex-direction:column;margin-top:23px}.account-dialog label{font-size:12px;color:#555;margin-bottom:8px;font-weight:600}
+.account-dialog input{height:42px;padding:0 11px;border:1px solid #ddd;border-radius:7px;outline:0;color:#333}.account-dialog input:focus{border-color:#c94b4b}
+.account-dialog form small{min-height:22px;padding-top:4px;color:#b83f3f;font-size:11px}
+.account-dialog form button{height:42px;margin-top:5px;border:0;border-radius:7px;background:#c94b4b;color:#fff;font-weight:650}.account-dialog form button:hover{background:#b63e3e}
+.account-dialog .account-warning{margin-top:17px;color:#999;font-size:11px}
+@media(max-width:620px){.account-dialog{padding:24px}.feed-actions{gap:5px}}
