@@ -15,6 +15,13 @@
       "when": 1793713196400,
       "tag": "0001_smiling_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793714970432,
+      "tag": "0002_redundant_omega_red",
+      "breakpoints": true
     }
   ]
 }

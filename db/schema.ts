@@ -16,6 +16,13 @@ export const accounts = sqliteTable("accounts", {
   createdAt: text("created_at").notNull(),
 });
 
+export const accountSecrets = sqliteTable("account_secrets", {
+  userId: text("user_id").primaryKey(),
+  deepseekKeyCiphertext: text("deepseek_key_ciphertext").notNull(),
+  deepseekKeyIv: text("deepseek_key_iv").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const sessions = sqliteTable("sessions", {
   tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull(),

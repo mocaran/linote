@@ -5,7 +5,7 @@
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [] };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], insightHasKey: false };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
@@ -44,6 +44,7 @@
       state.notes = data.notes;
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
+      await syncInsightKey();
       if (oldNotes.length) toast('旧笔记已导入账号');
     } catch (error) { toast(error.message || '笔记同步失败，请刷新重试'); }
   }
@@ -229,10 +230,9 @@
     closeEditor(); render(); toast('笔记已保存');
   }
   function exportNotes() {
-    const blob = new Blob([JSON.stringify({ app:'linote', exportedAt:new Date().toISOString(), notes:state.notes }, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob); const link = document.createElement('a');
-    link.href = url; link.download = 'linote-' + new Date().toISOString().slice(0,10) + '.json'; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (!state.account) { openAccount(); return; }
+    const link = document.createElement('a');
+    link.href = '/api/notes/export'; link.download = 'linote-' + new Date().toISOString().slice(0,10) + '.json'; link.click();
   }
   ['newNoteSidebar','newNoteTop','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
   $('allNotes').addEventListener('click', () => setTag(null));
@@ -244,27 +244,62 @@
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
   document.addEventListener('click', e => { if (!$('calendarPanel').hidden && !$('calendarPanel').contains(e.target) && !$('calendarToggle').contains(e.target)) { $('calendarPanel').hidden = true; $('calendarToggle').setAttribute('aria-expanded','false'); } });
   function insightStorageKey() { return INSIGHT_KEY + encodeURIComponent(state.account || ''); }
-  function readInsightKey() { try { return localStorage.getItem(insightStorageKey()) || ''; } catch { return ''; } }
+  async function insightKeyApi(method, payload) {
+    const response = await fetch('/api/insight-key',{method,headers:payload ? {'Content-Type':'application/json'} : {},body:payload ? JSON.stringify(payload) : undefined,credentials:'same-origin',cache:'no-store'});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || '密钥同步失败');
+    return data;
+  }
+  async function syncInsightKey() {
+    let data = await insightKeyApi('GET');
+    let localKey = '';
+    try { localKey = localStorage.getItem(insightStorageKey()) || ''; } catch {}
+    if (localKey) {
+      try { data = await insightKeyApi('PUT',{apiKey:localKey,ifMissing:true}); localStorage.removeItem(insightStorageKey()); }
+      catch (error) { toast(error.message || '旧密钥迁移失败'); }
+    }
+    state.insightHasKey = Boolean(data.hasKey);
+  }
   function showInsightPanel(name) {
-    ['insightHome','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
+    ['insightHome','insightRangePanel','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
     $('insightMessage').textContent = '';
   }
   function refreshInsightScope() {
     const select = $('insightScope'); const current = select.value; select.replaceChildren();
-    select.append(new Option('全部笔记', ''));
+    select.append(new Option('全部话题', ''));
     sortedTags().forEach(([tag,count]) => select.append(new Option('#' + tag + ' · ' + count + ' 条', tag)));
     select.value = [...select.options].some(option => option.value === current) ? current : '';
     refreshInsightCount();
   }
   function refreshInsightCount() {
     const tag = $('insightScope').value;
-    const count = tag ? state.notes.filter(note => note.tags.includes(tag)).length : state.notes.length;
+    const bounds = insightDateBounds();
+    const count = state.notes.filter(note => { const time=Date.parse(note.createdAt); return (!tag || note.tags.includes(tag)) && (!bounds.startDate || time >= Date.parse(bounds.startDate)) && (!bounds.endDate || time < Date.parse(bounds.endDate)); }).length;
     $('insightCount').textContent = count + ' 条笔记';
+    $('insightRangeSummary').textContent = bounds.label + ' · ' + (tag ? '#' + tag : '全部话题');
   }
-  function openInsight() {
+  function insightDateBounds() {
+    const preset = $('insightDatePreset').value;
+    if (preset === 'all') return {startDate:'',endDate:'',label:'不限日期'};
+    const today = new Date();
+    let start, end = new Date(today.getFullYear(),today.getMonth(),today.getDate()+1);
+    if (preset === 'last7') start = new Date(today.getFullYear(),today.getMonth(),today.getDate()-6);
+    else if (preset === 'week') start = new Date(today.getFullYear(),today.getMonth(),today.getDate() - ((today.getDay()+6)%7));
+    else if (preset === 'month') start = new Date(today.getFullYear(),today.getMonth(),1);
+    else {
+      const from = $('insightStartDate').value, to = $('insightEndDate').value;
+      start = from ? new Date(from+'T00:00:00') : null;
+      end = to ? new Date(to+'T00:00:00') : null;
+      if (end) end.setDate(end.getDate()+1);
+      return {startDate:start?.toISOString() || '',endDate:end?.toISOString() || '',label:from || to ? (from || '不限') + ' 至 ' + (to || '不限') : '自定义日期'};
+    }
+    return {startDate:start.toISOString(),endDate:end.toISOString(),label:{last7:'最近 7 天',week:'本周',month:'本月'}[preset]};
+  }
+  async function openInsight() {
     if (!state.account) { openAccount(); return; }
     refreshInsightScope(); showInsightPanel('insightHome'); $('insightLayer').hidden = false;
     document.body.style.overflow = 'hidden'; closeSidebar();
+    try { await syncInsightKey(); } catch (error) { $('insightMessage').textContent = error.message || '密钥同步失败'; }
   }
   function closeInsight() { $('insightLayer').hidden = true; document.body.style.overflow = ''; }
   function showInsightResult(insight) {
@@ -274,17 +309,17 @@
     $('insightResultBody').textContent = insight.content;
   }
   async function startInsight(mode) {
-    const key = readInsightKey();
-    if (!key) { showInsightPanel('insightKeyPanel'); $('insightMessage').textContent = '先设置 DeepSeek API 密钥'; return; }
+    if (!state.insightHasKey) { showInsightPanel('insightKeyPanel'); $('insightMessage').textContent = '先设置 DeepSeek API 密钥'; return; }
     const customPrompt = mode === 'custom' ? $('insightCustomPrompt').value.trim() : '';
     if (mode === 'custom' && !customPrompt) { $('insightMessage').textContent = '请先输入自定义视角'; return; }
     const scopeTag = $('insightScope').value;
-    if (!state.notes.some(note => !scopeTag || note.tags.includes(scopeTag))) { $('insightMessage').textContent = '所选范围内还没有笔记'; return; }
+    const bounds = insightDateBounds();
+    if (!state.notes.some(note => { const time=Date.parse(note.createdAt); return (!scopeTag || note.tags.includes(scopeTag)) && (!bounds.startDate || time >= Date.parse(bounds.startDate)) && (!bounds.endDate || time < Date.parse(bounds.endDate)); })) { $('insightMessage').textContent = '所选范围内还没有笔记'; return; }
     $('insightMessage').textContent = '正在阅读笔记并生成洞察…';
     $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = true; });
     try {
-      const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,mode,customPrompt,scopeTag}),credentials:'same-origin'});
-      const data = await response.json();
+      const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,customPrompt,scopeTag,...bounds,rangeLabel:bounds.label}),credentials:'same-origin'});
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '洞察失败');
       showInsightResult(data.insight);
     } catch (error) { $('insightMessage').textContent = error.message || '洞察失败，请稍后重试'; }
@@ -309,17 +344,22 @@
   $('insightClose').addEventListener('click',closeInsight);
   $('insightBackdrop').addEventListener('click',closeInsight);
   $('insightScope').addEventListener('change',refreshInsightCount);
+  $('insightRangeButton').addEventListener('click',() => showInsightPanel('insightRangePanel'));
+  $('insightRangeBack').addEventListener('click',() => showInsightPanel('insightHome'));
+  $('insightRangeApply').addEventListener('click',() => { const bounds=insightDateBounds(); if (bounds.startDate && bounds.endDate && bounds.startDate >= bounds.endDate) { $('insightMessage').textContent='结束日期需晚于开始日期'; return; } refreshInsightCount(); showInsightPanel('insightHome'); });
+  $('insightDatePreset').addEventListener('change',() => { $('insightCustomDates').hidden=$('insightDatePreset').value !== 'custom'; refreshInsightCount(); });
+  ['insightStartDate','insightEndDate'].forEach(id => $(id).addEventListener('change',refreshInsightCount));
   $('insightLayer').querySelectorAll('.insight-card').forEach(button => button.addEventListener('click',() => startInsight(button.dataset.mode)));
   $('insightCustomStart').addEventListener('click',() => startInsight('custom'));
-  $('insightSettingsButton').addEventListener('click',() => { $('insightKeyInput').value = readInsightKey(); showInsightPanel('insightKeyPanel'); });
+  $('insightSettingsButton').addEventListener('click',() => { $('insightKeyInput').value = ''; $('insightKeyInput').placeholder = state.insightHasKey ? '已设置密钥；输入新密钥可替换' : '粘贴 DeepSeek API 密钥'; showInsightPanel('insightKeyPanel'); });
   $('insightKeyBack').addEventListener('click',() => showInsightPanel('insightHome'));
-  $('insightKeySave').addEventListener('click',() => {
+  $('insightKeySave').addEventListener('click',async () => {
     const key = $('insightKeyInput').value.trim();
     if (!key || key.length > 300) { $('insightMessage').textContent = '请输入有效的 DeepSeek API 密钥'; return; }
-    try { localStorage.setItem(insightStorageKey(),key); showInsightPanel('insightHome'); toast('密钥已保存在当前浏览器'); }
-    catch { $('insightMessage').textContent = '当前浏览器无法保存密钥'; }
+    try { await insightKeyApi('PUT',{apiKey:key}); state.insightHasKey=true; $('insightKeyInput').value=''; showInsightPanel('insightHome'); toast('密钥已保存到账号'); }
+    catch (error) { $('insightMessage').textContent = error.message || '保存失败'; }
   });
-  $('insightKeyClear').addEventListener('click',() => { try { localStorage.removeItem(insightStorageKey()); } catch {} $('insightKeyInput').value = ''; $('insightMessage').textContent = '密钥已清除'; });
+  $('insightKeyClear').addEventListener('click',async () => { try { await insightKeyApi('DELETE'); state.insightHasKey=false; $('insightKeyInput').value = ''; $('insightMessage').textContent = '密钥已清除'; } catch (error) { $('insightMessage').textContent = error.message || '清除失败'; } });
   $('insightResultBack').addEventListener('click',() => showInsightPanel('insightHome'));
   $('insightHistoryBack').addEventListener('click',() => showInsightPanel('insightHome'));
   $('insightHistoryButton').addEventListener('click',showInsightHistory);
