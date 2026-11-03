@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f5">
+  <meta name="description" content="linote：轻轻记下想法，让话题自然生长。">
+  <title>linote · 让想法自然生长</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="brand-mark">l<span>.</span></span><div><strong>linote</strong><small>让想法自然生长</small></div></div>
+      <button class="new-button" id="newNoteSidebar" type="button"><span aria-hidden="true">＋</span> 写一条笔记 <kbd>N</kbd></button>
+      <div class="side-section">
+        <button class="nav-item active" id="allNotes" type="button"><span class="nav-icon">▦</span><span>全部笔记</span><span class="nav-count" id="allCount">0</span></button>
+      </div>
+      <div class="side-section topic-section">
+        <div class="section-heading"><span>话题</span><button type="button" id="sortButton" title="切换话题排序" aria-label="切换话题排序">笔记数 ↓</button></div>
+        <div class="topic-list" id="topicList"></div>
+        <p class="topic-hint" id="topicHint">给笔记添加话题后，会自动出现在这里。</p>
+      </div>
+      <div class="sidebar-bottom"><span class="storage-dot"></span>笔记保存在当前浏览器 <button type="button" id="exportButton">导出</button></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" type="button" id="mobileMenu" aria-label="打开菜单">☰</button>
+        <div class="crumb">我的空间 <span>/</span> <strong id="pageTitle">全部笔记</strong></div>
+        <div class="top-actions"><label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索笔记或话题" aria-label="搜索笔记或话题"><kbd>⌘ K</kbd></label><button class="top-new" id="newNoteTop" type="button">＋ <span>新笔记</span></button></div>
+      </header>
+      <div class="content">
+        <section class="intro"><div><div class="eyebrow">YOUR THOUGHTS, IN FLOW</div><h1 id="heading">全部笔记</h1><p id="subtitle">每一个小小的想法，都值得被好好记下。</p></div><div class="intro-decoration" aria-hidden="true"><span>✳</span></div></section>
+        <div class="feed-heading"><div><strong id="resultCount">0 条笔记</strong><span id="filterLabel">按最近编辑排序</span></div><button type="button" id="clearFilter" hidden>清除筛选 ×</button></div>
+        <section class="notes" id="notes" aria-live="polite"></section>
+        <section class="empty" id="empty"><div class="empty-illustration"><span>✦</span><i></i><b>＋</b></div><h2 id="emptyTitle">从一条笔记开始</h2><p id="emptyText">记录此刻的灵感，添加话题，让想法慢慢连接。</p><button type="button" id="emptyNew">写第一条笔记 <span>↗</span></button></section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-layer" id="modalLayer" hidden>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <section class="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+      <div class="editor-header"><div><span class="editor-spark">✳</span><h2 id="editorTitle">写一条笔记</h2></div><button type="button" id="closeEditor" aria-label="关闭编辑器">×</button></div>
+      <form id="noteForm">
+        <textarea id="noteBody" placeholder="现在的想法是…" maxlength="20000" required></textarea>
+        <div class="tag-area"><div class="tag-title"><span>#</span> 添加话题 <small>一条笔记可以有多个话题</small></div><div class="selected-tags" id="selectedTags"></div><input id="tagInput" type="text" placeholder="输入话题名称，按回车添加" autocomplete="off" maxlength="60" aria-label="话题名称"><div class="tag-suggestions" id="tagSuggestions" hidden></div></div>
+        <div class="editor-footer"><span id="editorHint">自动保存在当前浏览器</span><div><button type="button" class="cancel" id="cancelEditor">取消</button><button type="submit" class="save" id="saveNote">保存笔记 <span>↗</span></button></div></div>
+      </form>
+    </section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
