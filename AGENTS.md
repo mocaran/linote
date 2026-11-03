@@ -1,0 +1,3 @@
+# linote release instructions
+
+The user wants the stable Android download URL `https://linote-notes-20261103.thinmerit.chatgpt.site/linote.apk` to contain a fresh APK with every published linote update. Before each publication, increment `android:versionCode` in `android/app/src/main/AndroidManifest.xml`, rebuild the APK with `android/build-apk.ps1`, and verify that `public/linote.apk` matches `android/linote.apk`. The build script copies it automatically. Keep the existing local `android/debug.keystore` so new APKs can update the installed app. Publish the web source and APK in the same Site version, then verify the public APK URL serves the new bytes.

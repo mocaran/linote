@@ -47,4 +47,7 @@ if (-not (Test-Path -LiteralPath $debugKey)) {
 if ($LASTEXITCODE) { throw 'APK signing failed' }
 & $apksigner verify --verbose $OutputPath
 if ($LASTEXITCODE) { throw 'APK signature verification failed' }
+$publicApk = Join-Path (Split-Path $PSScriptRoot -Parent) 'public\linote.apk'
+Copy-Item -LiteralPath $OutputPath -Destination $publicApk -Force
+if ((Get-FileHash $OutputPath -Algorithm SHA256).Hash -ne (Get-FileHash $publicApk -Algorithm SHA256).Hash) { throw 'Hosted APK copy verification failed' }
 Write-Output $OutputPath

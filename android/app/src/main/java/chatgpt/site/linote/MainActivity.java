@@ -5,9 +5,13 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
@@ -17,6 +21,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
     private static final String HOME = "https://linote-notes-20261103.thinmerit.chatgpt.site/";
@@ -28,7 +33,17 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(250, 250, 250));
-        setContentView(webView);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(250, 250, 250));
+        root.addView(webView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (Build.VERSION.SDK_INT >= 35) {
+            root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+                Insets bars = windowInsets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                root.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return windowInsets;
+            });
+        }
+        setContentView(root);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);

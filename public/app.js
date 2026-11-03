@@ -234,7 +234,7 @@
     const link = document.createElement('a');
     link.href = '/api/notes/export'; link.download = 'linote-' + new Date().toISOString().slice(0,10) + '.json'; link.click();
   }
-  ['newNoteSidebar','newNoteTop','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
+  ['newNoteSidebar','newNoteTop','mobileFab','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
   $('allNotes').addEventListener('click', () => setTag(null));
   $('reviewNotes').addEventListener('click', chooseReview);
   $('reviewAgain').addEventListener('click', chooseReview);
@@ -401,6 +401,23 @@
   function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
   $('mobileMenu').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
   $('mobileShade').addEventListener('click', closeSidebar);
+  function canSwipeOpen(event) {
+    return matchMedia('(max-width:620px)').matches && !$('sidebar').classList.contains('open') && $('modalLayer').hidden && $('insightLayer').hidden && $('accountLayer').hidden && !event.target.closest('input,textarea,select');
+  }
+  function swipeOpensSidebar(start, endX, endY) {
+    if (!start) return false;
+    const dx = start.x - endX, dy = start.y - endY;
+    return Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.3 && (dx > 0 || start.x < 32);
+  }
+  const main = document.querySelector('.main');
+  let mainTouchStart = null;
+  main.addEventListener('touchstart', e => { mainTouchStart = canSwipeOpen(e) ? {x:e.touches[0].clientX,y:e.touches[0].clientY} : null; }, {passive:true});
+  main.addEventListener('touchend', e => { if (mainTouchStart && swipeOpensSidebar(mainTouchStart,e.changedTouches[0].clientX,e.changedTouches[0].clientY)) openSidebar(); mainTouchStart=null; }, {passive:true});
+  main.addEventListener('touchcancel', () => { mainTouchStart=null; }, {passive:true});
+  let mainPointerStart = null;
+  main.addEventListener('pointerdown', e => { mainPointerStart = canSwipeOpen(e) ? {x:e.clientX,y:e.clientY} : null; });
+  main.addEventListener('pointerup', e => { if (mainPointerStart && swipeOpensSidebar(mainPointerStart,e.clientX,e.clientY)) openSidebar(); mainPointerStart=null; });
+  main.addEventListener('pointercancel', () => { mainPointerStart=null; });
   let touchStartX = null;
   $('sidebar').addEventListener('touchstart', e => { touchStartX = e.touches[0]?.clientX ?? null; }, {passive:true});
   $('sidebar').addEventListener('touchend', e => { if (touchStartX !== null && touchStartX - (e.changedTouches[0]?.clientX ?? touchStartX) > 65) closeSidebar(); touchStartX = null; }, {passive:true});
