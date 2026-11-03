@@ -343,12 +343,12 @@
     e.preventDefault();
     const account = normalizeAccount($('accountInput').value);
     const password = $('passwordInput').value;
-    if (!validAccount(account) || password.length < 8 || password.length > 128) { $('accountError').textContent = '账号需为 1 至 32 个字符，密码至少 8 位'; return; }
+    if (!validAccount(account)) { $('accountError').textContent = '账号需为 1 至 32 个字符'; return; }
     $('authSubmit').disabled = true;
     try {
       const response = await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,username:account,password}),credentials:'same-origin'});
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '登录失败');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || '服务暂时不可用，请稍后再试');
     } catch (error) { $('authSubmit').disabled = false; $('accountError').textContent = error.message || '登录失败'; return; }
     $('authSubmit').disabled = false;
     state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';

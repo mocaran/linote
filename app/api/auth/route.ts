@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (body.action === "logout") return Response.json({ok:true},{headers:{"Set-Cookie":await clearSession(request)}});
   const username = normalizeUsername(body.username);
   const password = body.password;
-  if (!username || !validPassword(password)) return Response.json({error:"账号需为 1 至 32 个字符，密码至少 8 位"},{status:400});
+  if (!username || !validPassword(password)) return Response.json({error:"账号需为 1 至 32 个字符，密码需为文本"},{status:400});
   const account = await env.DB.prepare("SELECT password_hash,salt FROM accounts WHERE username = ?").bind(username).first<{password_hash:string;salt:string}>();
   if (body.action === "register") {
     if (account) return Response.json({error:"账号已存在，请登录"},{status:409});
