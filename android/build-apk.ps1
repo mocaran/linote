@@ -19,16 +19,25 @@ $aligned = Join-Path $out 'aligned.apk'
 $classes = Join-Path $out 'classes'
 $dex = Join-Path $out 'dex'
 $debugKey = Join-Path $PSScriptRoot 'debug.keystore'
+$assets = Join-Path $out 'assets'
+$webRoot = Split-Path $PSScriptRoot -Parent
 
 foreach ($path in @($aapt,$d8,$zipalign,$apksigner,$javac,$keytool,$jar,$platform)) {
     if (-not (Test-Path -LiteralPath $path)) { throw "Missing Android build tool: $path" }
 }
-New-Item -ItemType Directory -Force -Path $out,$classes,$dex | Out-Null
+New-Item -ItemType Directory -Force -Path $out,$classes,$dex,$assets | Out-Null
+& node (Join-Path $webRoot 'scripts\generate-offline.mjs')
+if ($LASTEXITCODE) { throw 'Offline page generation failed' }
+foreach ($asset in @('offline.html','app.js','styles.css','overrides.css','features.css','icon.png','manifest.webmanifest')) {
+    Copy-Item -LiteralPath (Join-Path $webRoot "public\$asset") -Destination (Join-Path $assets $asset) -Force
+}
 
 & $aapt compile --dir (Join-Path $PSScriptRoot 'app\src\main\res') -o $compiled
 if ($LASTEXITCODE) { throw 'aapt2 compile failed' }
 & $aapt link -o $unsigned -I $platform --manifest (Join-Path $PSScriptRoot 'app\src\main\AndroidManifest.xml') --min-sdk-version 29 --target-sdk-version 35 $compiled
 if ($LASTEXITCODE) { throw 'aapt2 link failed' }
+& $jar uf $unsigned -C $out assets
+if ($LASTEXITCODE) { throw 'APK web assets failed' }
 
 & $javac -encoding UTF-8 -source 17 -target 17 -classpath $platform -d $classes (Join-Path $PSScriptRoot 'app\src\main\java\chatgpt\site\linote\MainActivity.java')
 if ($LASTEXITCODE) { throw 'javac failed' }

@@ -24,11 +24,14 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceResponse;
 import android.widget.Toast;
 import android.widget.FrameLayout;
 import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.io.InputStream;
+import java.util.HashMap;
 
 public class MainActivity extends Activity {
     private static final String HOME = "https://linote-notes-20261103.thinmerit.chatgpt.site/";
@@ -64,7 +67,8 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/7");
+        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/8");
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
 
@@ -78,7 +82,7 @@ public class MainActivity extends Activity {
                     break;
                 case MotionEvent.ACTION_MOVE:
                     if (!swipeHandled && event.getPointerCount() == 1) {
-                        float dx = touchStartX - event.getX();
+                        float dx = event.getX() - touchStartX;
                         float dy = touchStartY - event.getY();
                         if (dx > swipeThreshold && dx > Math.abs(dy) * 1.3f) {
                             swipeHandled = true;
@@ -87,6 +91,12 @@ public class MainActivity extends Activity {
                     }
                     break;
                 case MotionEvent.ACTION_UP:
+                    if (!swipeHandled && event.getPointerCount() == 1) {
+                        float dx = event.getX() - touchStartX;
+                        float dy = touchStartY - event.getY();
+                        if (dx > swipeThreshold && dx > Math.abs(dy) * 1.3f)
+                            webView.evaluateJavascript("window.linoteHandleSwipe && window.linoteHandleSwipe()", null);
+                    }
                 case MotionEvent.ACTION_CANCEL:
                     swipeHandled = false;
                     break;
@@ -109,6 +119,26 @@ public class MainActivity extends Activity {
             }
         });
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (!HOST.equals(uri.getHost()) || !"https".equals(uri.getScheme())) return null;
+                String name;
+                String path = uri.getPath();
+                if ("/".equals(path) || "/offline.html".equals(path)) name = "offline.html";
+                else if (path != null && path.matches("/(app\\.js|styles\\.css|overrides\\.css|features\\.css|icon\\.png|manifest\\.webmanifest)")) name = path.substring(1);
+                else return null;
+                try {
+                    InputStream file = getAssets().open(name);
+                    String mime = name.endsWith(".css") ? "text/css" : name.endsWith(".js") ? "text/javascript" : name.endsWith(".png") ? "image/png" : name.endsWith(".webmanifest") ? "application/manifest+json" : "text/html";
+                    WebResourceResponse response = new WebResourceResponse(mime, "UTF-8", file);
+                    HashMap<String,String> headers = new HashMap<>();
+                    headers.put("Cache-Control", "no-store");
+                    response.setResponseHeaders(headers);
+                    return response;
+                } catch (Exception error) { return null; }
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
@@ -148,8 +178,8 @@ public class MainActivity extends Activity {
             }
         });
 
-        if (savedInstanceState == null) webView.loadUrl(HOME);
-        else webView.restoreState(savedInstanceState);
+        String boot = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><script>(async()=>{try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}if(window.caches){const ks=await caches.keys();await Promise.all(ks.filter(k=>k.startsWith('linote-shell-')).map(k=>caches.delete(k)))}}catch(e){}location.replace('/?app-shell=8')})()</script></body></html>";
+        webView.loadDataWithBaseURL(HOME, boot, "text/html", "UTF-8", HOME);
     }
 
     @Override

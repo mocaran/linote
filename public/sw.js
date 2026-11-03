@@ -1,22 +1,16 @@
-const CACHE = 'linote-shell-v1.6';
-const CORE = ['/', '/app.js', '/styles.css', '/overrides.css', '/features.css', '/icon.png', '/manifest.webmanifest'];
+const CACHE = 'linote-shell-v1.7';
+const CORE = ['/offline.html', '/app.js', '/styles.css', '/overrides.css', '/features.css', '/icon.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    const page = await fetch('/', {cache:'reload',headers:{Accept:'text/html'}});
-    if (page.ok) {
-      await cache.put('/', page.clone());
-      const html = await page.text();
-      const assets = [...html.matchAll(/(?:src|href)="(\/[^"?#]+(?:\?[^"#]*)?)"/g)]
-        .map(match => match[1]).filter(path => !path.startsWith('/api/') && !path.endsWith('.apk'));
-      await Promise.allSettled([...new Set([...CORE.slice(1), ...assets])].map(async path => {
-        const response = await fetch(path);
-        if (response.ok) await cache.put(path, response);
-      }));
-    }
+    await Promise.all(CORE.map(async path => {
+      const response = await fetch(path,{cache:'reload'});
+      if (!response.ok) throw new Error('Offline asset missing: ' + path);
+      await cache.put(path,response);
+    }));
     await self.skipWaiting();
-  })().catch(() => self.skipWaiting()));
+  })());
 });
 
 self.addEventListener('activate', event => {
@@ -35,10 +29,9 @@ self.addEventListener('fetch', event => {
     event.respondWith((async () => {
       try {
         const response = await fetch(request, {signal:AbortSignal.timeout(4000)});
-        if (response.ok) (await caches.open(CACHE)).put('/',response.clone());
         return response;
       } catch {
-        return await caches.match('/') || new Response('离线页面尚未缓存，请联网打开一次 linote。',{headers:{'Content-Type':'text/plain; charset=utf-8'},status:503});
+        return await caches.match('/offline.html') || new Response('离线页面尚未缓存，请联网打开一次 linote。',{headers:{'Content-Type':'text/plain; charset=utf-8'},status:503});
       }
     })());
     return;

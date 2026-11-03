@@ -14,6 +14,25 @@
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
   function readAccount() { try { const value = normalizeAccount(localStorage.getItem(ACCOUNT_KEY) || ''); return validAccount(value) ? value : null; } catch { return null; } }
+  async function rememberedAccount() {
+    const local = readAccount();
+    if (local) return local;
+    try {
+      const last = await offlineRecord('last-account');
+      if (last === '') return null;
+      if (typeof last === 'string' && validAccount(last)) return last;
+      const db = await offlineDatabase();
+      const keys = await new Promise((resolve,reject) => { const request=db.transaction('records').objectStore('records').getAllKeys(); request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error); });
+      db.close();
+      const accounts = keys.filter(key => typeof key === 'string' && key.startsWith('notes:'));
+      if (accounts.length === 1) return decodeURIComponent(accounts[0].slice(6));
+    } catch {}
+    return null;
+  }
+  async function rememberAccount(account) {
+    try { localStorage.setItem(ACCOUNT_KEY,account); } catch {}
+    try { await offlineRecord('last-account',account); } catch {}
+  }
   function offlineKey(kind, account = state.account) { return kind + ':' + encodeURIComponent(account || ''); }
   function offlineDatabase() {
     return new Promise((resolve,reject) => {
@@ -462,6 +481,30 @@
     details.append(el('summary','','查看 DeepSeek 思考过程'),el('pre','',reasoning));
     host.append(details);
   }
+  async function readSse(response, onEvent) {
+    if (!response.ok) { const data=await response.json().catch(() => ({})); throw new Error(data.error || 'AI 请求失败'); }
+    if (!response.body) throw new Error('无法读取 AI 实时回复');
+    const reader=response.body.getReader(), decoder=new TextDecoder();
+    let pending='', completed=null;
+    while (true) {
+      const {value,done}=await reader.read();
+      pending += decoder.decode(value || new Uint8Array(),{stream:!done});
+      let boundary;
+      while ((boundary=/(?:\r?\n){2}/.exec(pending))) {
+        const block=pending.slice(0,boundary.index); pending=pending.slice(boundary.index+boundary[0].length);
+        const event=block.match(/^event:\s*(.+)$/m)?.[1];
+        const raw=block.match(/^data:\s*(.+)$/m)?.[1];
+        if (!event || !raw) continue;
+        let data; try { data=JSON.parse(raw); } catch { continue; }
+        if (event==='error') throw new Error(data.error || 'AI 生成失败');
+        onEvent(event,data);
+        if (event==='done') completed=data;
+      }
+      if (done) break;
+    }
+    if (!completed) throw new Error('AI 回复中断，请重试');
+    return completed;
+  }
   function showInsightResult(insight, reasoning = '') {
     showInsightPanel('insightResult');
     $('insightResultTitle').textContent = insight.title;
@@ -480,14 +523,20 @@
     $('insightResultTitle').textContent = $('insightLayer').querySelector(`.insight-card[data-mode="${mode}"] strong`)?.textContent || 'AI 洞察';
     $('insightResultMeta').textContent = bounds.label + ' · 正在分析笔记';
     $('insightResultBody').textContent = '正在阅读笔记并生成洞察，请稍候…';
-    renderReasoning($('insightResult'),'');
+    renderReasoning($('insightResult'),'正在等待 DeepSeek 思考…');
+    $('insightResult').querySelector('details').open=true;
     $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = true; });
     try {
-      const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,customPrompt,scopeTag,...bounds,rangeLabel:bounds.label}),credentials:'same-origin'});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || '洞察失败');
-      showInsightResult(data.insight,data.reasoning || '');
-    } catch (error) { $('insightResultBody').textContent = error.message || '洞察失败，请稍后重试'; }
+      const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({mode,customPrompt,scopeTag,...bounds,rangeLabel:bounds.label}),credentials:'same-origin'});
+      let thought='',answer='';
+      const data = await readSse(response,(event,chunk) => {
+        if (event==='progress') $('insightResultMeta').textContent=chunk.text;
+        if (event==='reasoning') { thought+=chunk.text; $('insightResult').querySelector('.ai-reasoning pre').textContent=thought; }
+        if (event==='answer') { answer+=chunk.text; $('insightResultBody').textContent=answer; }
+      });
+      showInsightResult(data.insight,thought || data.reasoning || '');
+      if (thought) $('insightResult').querySelector('details').open=true;
+    } catch (error) { $('insightResultBody').textContent = error.message || '洞察失败，请稍后重试'; renderReasoning($('insightResult'),''); }
     finally { $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = false; }); }
   }
   function renderChatMessages() {
@@ -510,10 +559,19 @@
     $('insightChatSend').disabled = true;
     $('insightMessage').textContent = '正在阅读笔记并回复…';
     try {
-      const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds}),credentials:'same-origin'});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || '对话失败');
-      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:data.answer,reasoning:data.reasoning || ''}; renderChatMessages();
+      const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds}),credentials:'same-origin'});
+      let thought='',answer='';
+      const data = await readSse(response,(event,chunk) => {
+        if (event==='progress') $('insightMessage').textContent=chunk.text;
+        if (event==='reasoning') thought+=chunk.text;
+        if (event==='answer') answer+=chunk.text;
+        if (event==='reasoning' || event==='answer') {
+          state.chatMessages[state.chatMessages.length-1]={role:'assistant',content:answer || '正在思考…',reasoning:thought};
+          renderChatMessages();
+          const details=$('insightChatMessages').querySelector('.insight-chat-message:last-child details'); if (details) details.open=true;
+        }
+      });
+      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:data.answer,reasoning:thought || data.reasoning || ''}; renderChatMessages();
       $('insightChatInput').value = '';
       $('insightMessage').textContent = '';
     } catch (error) {
@@ -589,6 +647,7 @@
   $('switchAccount').addEventListener('click', async () => {
     try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {}
     try { localStorage.removeItem(ACCOUNT_KEY); } catch {}
+    try { await offlineRecord('last-account',''); } catch {}
     state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
   });
   $('accountForm').addEventListener('submit', async e => {
@@ -606,13 +665,16 @@
     state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
     $('accountName').textContent = account;
     $('accountLayer').hidden = true;
+    await rememberAccount(account);
     closeSidebar(); render(); await loadFromAccount();
-    localStorage.setItem(ACCOUNT_KEY, account);
   });
   function openSidebar() { $('sidebar').classList.add('open'); $('mobileShade').hidden = false; }
   function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
   $('mobileMenu').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
   $('mobileShade').addEventListener('click', closeSidebar);
+  $('mobileShade').addEventListener('pointerdown',closeSidebar);
+  $('mobileShade').addEventListener('touchstart',closeSidebar,{passive:true});
+  document.addEventListener('pointerdown',e => { if ($('sidebar').classList.contains('open') && !$('sidebar').contains(e.target) && !$('mobileMenu').contains(e.target)) closeSidebar(); },true);
   function navigateBack() {
     if (!$('modalLayer').hidden) { closeEditor(); return true; }
     if (!$('insightLayer').hidden) {
@@ -631,11 +693,8 @@
     if (Date.now() - lastSwipeAt < 700) return true;
     lastSwipeAt = Date.now();
     if (navigateBack()) return true;
-    if (matchMedia('(max-width:620px)').matches && $('accountLayer').hidden) {
-      openSidebar();
-      return true;
-    }
-    return false;
+    if (matchMedia('(max-width:620px)').matches && $('accountLayer').hidden) openSidebar();
+    return true;
   };
   function canSwipeOpen(event) {
     return matchMedia('(max-width:620px)').matches && (
@@ -645,13 +704,14 @@
   }
   function swipeOpensSidebar(start, endX, endY) {
     if (!start) return false;
-    const dx = start.x - endX, dy = start.y - endY;
+    const dx = endX - start.x, dy = endY - start.y;
     return dx > 56 && dx > Math.abs(dy) * 1.3;
   }
   window.linoteHandleSwipe = () => {
     if (!matchMedia('(max-width:620px)').matches) return;
     if (Date.now() - lastSwipeAt < 700) return;
     lastSwipeAt = Date.now();
+    if ($('sidebar').classList.contains('open')) return;
     if (!navigateBack() && $('accountLayer').hidden) openSidebar();
   };
   let mainTouchStart = null;
@@ -661,7 +721,7 @@
       window.linoteHandleSwipe(); mainTouchStart = null;
     }
   }, {passive:true,capture:true});
-  document.addEventListener('touchend', () => { mainTouchStart=null; }, {passive:true,capture:true});
+  document.addEventListener('touchend', e => { if (mainTouchStart && e.changedTouches.length === 1 && swipeOpensSidebar(mainTouchStart,e.changedTouches[0].clientX,e.changedTouches[0].clientY)) window.linoteHandleSwipe(); mainTouchStart=null; }, {passive:true,capture:true});
   document.addEventListener('touchcancel', () => { mainTouchStart=null; }, {passive:true,capture:true});
   let mainPointerStart = null;
   document.addEventListener('pointerdown', e => { mainPointerStart = canSwipeOpen(e) ? {x:e.clientX,y:e.clientY} : null; }, true);
@@ -670,7 +730,7 @@
       window.linoteHandleSwipe(); mainPointerStart = null;
     }
   }, true);
-  document.addEventListener('pointerup', () => { mainPointerStart=null; }, true);
+  document.addEventListener('pointerup', e => { if (mainPointerStart && swipeOpensSidebar(mainPointerStart,e.clientX,e.clientY)) window.linoteHandleSwipe(); mainPointerStart=null; }, true);
   document.addEventListener('pointercancel', () => { mainPointerStart=null; }, true);
   let touchStartX = null;
   $('sidebar').addEventListener('touchstart', e => { touchStartX = e.touches[0]?.clientX ?? null; }, {passive:true});
@@ -721,17 +781,17 @@
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if (!document.body.classList.contains('linote-android') && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
   async function startApp() {
-    const remembered = readAccount();
+    const remembered = await rememberedAccount();
     if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); render(); }
     if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
-      if (response.status === 401) { openAccount(); return; }
+      if (response.status === 401) { if (!remembered) openAccount(); else toast('账号会话已过期，重新登录后可同步'); return; }
       if (!response.ok) throw new Error('账号服务暂时不可用');
       const user = await response.json();
-      state.account = user.username; $('accountName').textContent = user.username; localStorage.setItem(ACCOUNT_KEY,user.username); await loadFromAccount();
+      state.account = user.username; $('accountName').textContent = user.username; await rememberAccount(user.username); await loadFromAccount();
     } catch { if (!remembered) openAccount(); else toast('连接不可用 · 已打开本机笔记'); }
   }
   window.addEventListener('online',() => { if (state.account) loadFromAccount(); });
