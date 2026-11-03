@@ -1,11 +1,13 @@
 import { env } from "cloudflare:workers";
-import { clearSession, createSession, hashPassword, newSalt, normalizeUsername, sameOrigin, sessionUser, validPassword, verifyPassword } from "../../../lib/auth";
+import { clearSession, createSession, hashPassword, newSalt, normalizeUsername, renewSession, sameOrigin, sessionUser, validPassword, verifyPassword } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const user = await sessionUser(request);
-  return user ? Response.json({username:user.username},{headers:{"Cache-Control":"no-store"}}) : Response.json({error:"未登录"},{status:401,headers:{"Cache-Control":"no-store"}});
+  if (!user) return Response.json({error:"未登录"},{status:401,headers:{"Cache-Control":"no-store"}});
+  const refreshedCookie = await renewSession(request);
+  return Response.json({username:user.username},{headers:{"Cache-Control":"no-store",...(refreshedCookie ? {"Set-Cookie":refreshedCookie} : {})}});
 }
 
 export async function POST(request: Request) {

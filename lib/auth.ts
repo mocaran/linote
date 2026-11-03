@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 
 const COOKIE = "linote_session";
-const SESSION_DAYS = 30;
+const SESSION_DAYS = 3650;
 
 export function normalizeUsername(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -55,6 +55,16 @@ export async function createSession(request: Request, userId: string): Promise<s
   const now = new Date();
   const expires = new Date(now.getTime()+SESSION_DAYS*86400000);
   await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at,created_at) VALUES (?,?,?,?)").bind(hash,userId,expires.toISOString(),now.toISOString()).run();
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS*86400}${secure}`;
+}
+
+export async function renewSession(request: Request): Promise<string | null> {
+  const token = cookieToken(request);
+  if (!token || !env.DB) return null;
+  const expires = new Date(Date.now()+SESSION_DAYS*86400000).toISOString();
+  await env.DB.prepare("UPDATE sessions SET expires_at=? WHERE token_hash=? AND expires_at>?")
+    .bind(expires,await tokenHash(token),new Date().toISOString()).run();
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   return `${COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS*86400}${secure}`;
 }

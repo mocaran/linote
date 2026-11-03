@@ -4,8 +4,9 @@
   const ACCOUNT_KEY = 'linote.account.v1';
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
+  const DRAFT_KEY = 'linote.drafts.v1.';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], insightHasKey: false };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
@@ -171,17 +172,34 @@
     const tag = normalizeTag(raw);
     if (tag && !state.draftTags.some(t => t.toLocaleLowerCase() === tag.toLocaleLowerCase())) state.draftTags.push(tag);
     $('tagInput').value = '';
-    renderDraftTags(); renderSuggestions();
+    renderDraftTags(); renderSuggestions(); persistEditorDraft();
   }
   function renderDraftTags() {
     const container = $('selectedTags'); container.replaceChildren();
     state.draftTags.forEach(tag => {
       const chip = el('span', 'selected-tag', '#' + tag);
       const remove = el('button', '', '×'); remove.type = 'button'; remove.setAttribute('aria-label', '移除话题 ' + tag);
-      remove.addEventListener('click', () => { state.draftTags = state.draftTags.filter(t => t !== tag); renderDraftTags(); renderSuggestions(); });
+      remove.addEventListener('click', () => { state.draftTags = state.draftTags.filter(t => t !== tag); renderDraftTags(); renderSuggestions(); persistEditorDraft(); });
       chip.append(remove); container.append(chip);
     });
   }
+  function draftStorageKey() { return DRAFT_KEY + encodeURIComponent(state.account || 'guest'); }
+  function readDrafts() {
+    try { const saved = JSON.parse(localStorage.getItem(draftStorageKey()) || '[]'); return Array.isArray(saved) ? saved.filter(item => item && typeof item.body === 'string' && (item.id === null || typeof item.id === 'string')).map(item => ({...item,tags:Array.isArray(item.tags) ? item.tags : []})) : []; }
+    catch { return []; }
+  }
+  function writeDrafts(drafts) { try { localStorage.setItem(draftStorageKey(), JSON.stringify(drafts)); } catch { toast('草稿保存失败，请检查设备存储空间'); } }
+  function persistEditorDraft() {
+    if ($('modalLayer').hidden) return;
+    const id = state.editing || null;
+    const drafts = readDrafts().filter(item => item.id !== id);
+    const body = $('noteBody').value;
+    const tagInput = $('tagInput').value;
+    if (body || tagInput || state.draftTags.length) drafts.unshift({id,body,tagInput,tags:[...state.draftTags],updatedAt:new Date().toISOString()});
+    writeDrafts(drafts);
+    $('editorHint').textContent = body || tagInput ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
+  }
+  function clearEditorDraft(id) { writeDrafts(readDrafts().filter(item => item.id !== id)); }
   function renderSuggestions() {
     const input = $('tagInput').value.trim().replace(/^#/, '').toLocaleLowerCase();
     const matches = [...tagCounts().keys()].filter(t => !state.draftTags.includes(t) && (!input || t.toLocaleLowerCase().includes(input))).slice(0,6);
@@ -190,18 +208,21 @@
     matches.forEach(tag => { const b = el('button', '', '#' + tag); b.type = 'button'; b.addEventListener('click', () => { addTag(tag); $('tagInput').focus(); }); box.append(b); });
   }
   function openEditor(id = null) {
-    state.editing = id;
+    const draft = id === null ? readDrafts()[0] : readDrafts().find(item => item.id === id);
+    if (id === null && draft) id = draft.id;
     const note = state.notes.find(n => n.id === id);
-    state.draftTags = note ? [...note.tags] : (state.tag ? [state.tag] : []);
+    state.editing = note?.id || null;
+    state.draftTags = draft ? [...draft.tags] : note ? [...note.tags] : (state.tag ? [state.tag] : []);
     $('editorTitle').textContent = note ? '编辑笔记' : '写一条笔记';
-    $('noteBody').value = note?.body || '';
-    $('tagInput').value = '';
+    $('noteBody').value = draft?.body ?? note?.body ?? '';
+    $('tagInput').value = draft?.tagInput || '';
     renderDraftTags(); renderSuggestions();
     $('modalLayer').hidden = false;
+    $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
     setTimeout(() => $('noteBody').focus(), 0);
   }
-  function closeEditor() { $('modalLayer').hidden = true; document.body.style.overflow = ''; state.editing = null; }
+  function closeEditor() { persistEditorDraft(); $('modalLayer').hidden = true; document.body.style.overflow = ''; state.editing = null; }
   async function deleteNote(id) {
     if (!confirm('确定删除这条笔记吗？')) return;
     try { await api('DELETE', undefined, id); } catch (error) { toast(error.message || '删除失败'); return; }
@@ -227,8 +248,11 @@
     $('saveNote').disabled = false;
     state.notes = [note, ...state.notes.filter(n => n.id !== note.id)];
     state.reviewIds = null;
-    closeEditor(); render(); toast('笔记已保存');
+    const draftId = state.editing || null;
+    closeEditor(); clearEditorDraft(draftId); render(); toast('笔记已保存');
   }
+  $('noteBody').addEventListener('input', persistEditorDraft);
+  $('tagInput').addEventListener('input', persistEditorDraft);
   function exportNotes() {
     if (!state.account) { openAccount(); return; }
     const link = document.createElement('a');
@@ -261,7 +285,7 @@
     state.insightHasKey = Boolean(data.hasKey);
   }
   function showInsightPanel(name) {
-    ['insightHome','insightRangePanel','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
+    ['insightHome','insightChat','insightRangePanel','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
     $('insightMessage').textContent = '';
   }
   function refreshInsightScope() {
@@ -325,6 +349,48 @@
     } catch (error) { $('insightMessage').textContent = error.message || '洞察失败，请稍后重试'; }
     finally { $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = false; }); }
   }
+  function renderChatMessages() {
+    const box = $('insightChatMessages'); box.replaceChildren();
+    state.chatMessages.forEach(message => {
+      const item = el('div','insight-chat-message ' + message.role);
+      item.append(el('strong','',message.role === 'user' ? '你' : 'AI'),el('div','',message.content));
+      box.append(item);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+  async function sendChat(question) {
+    if (!question.trim()) return;
+    const history = state.chatMessages.slice(-12);
+    const scopeTag = $('insightScope').value;
+    const bounds = insightDateBounds();
+    state.chatMessages.push({role:'user',content:question.trim()}); renderChatMessages();
+    $('insightChatSend').disabled = true;
+    $('insightMessage').textContent = '正在阅读笔记并回复…';
+    try {
+      const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds}),credentials:'same-origin'});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || '对话失败');
+      state.chatMessages.push({role:'assistant',content:data.answer}); renderChatMessages();
+      $('insightChatInput').value = '';
+      $('insightMessage').textContent = '';
+    } catch (error) {
+      state.chatMessages.pop(); renderChatMessages();
+      $('insightMessage').textContent = error.message || '对话失败，请重试';
+    } finally { $('insightChatSend').disabled = false; }
+  }
+  function startChat() {
+    const question = $('insightCustomPrompt').value.trim();
+    if (!question) { $('insightMessage').textContent = '先写下你想聊的问题'; $('insightCustomPrompt').focus(); return; }
+    if (!state.insightHasKey) { showInsightPanel('insightKeyPanel'); $('insightMessage').textContent = '先设置 DeepSeek API 密钥'; return; }
+    const bounds = insightDateBounds();
+    const scopeTag = $('insightScope').value;
+    const key = JSON.stringify([scopeTag,bounds.startDate,bounds.endDate]);
+    if (state.chatScope !== key) { state.chatScope = key; state.chatMessages = []; }
+    $('insightChatScope').textContent = bounds.label + ' · ' + (scopeTag ? '#' + scopeTag : '全部话题');
+    renderChatMessages(); showInsightPanel('insightChat');
+    sendChat(question);
+    $('insightCustomPrompt').value = '';
+  }
   async function showInsightHistory() {
     showInsightPanel('insightHistory'); $('insightHistoryList').textContent = '正在读取…';
     try {
@@ -350,7 +416,9 @@
   $('insightDatePreset').addEventListener('change',() => { $('insightCustomDates').hidden=$('insightDatePreset').value !== 'custom'; refreshInsightCount(); });
   ['insightStartDate','insightEndDate'].forEach(id => $(id).addEventListener('change',refreshInsightCount));
   $('insightLayer').querySelectorAll('.insight-card').forEach(button => button.addEventListener('click',() => startInsight(button.dataset.mode)));
-  $('insightCustomStart').addEventListener('click',() => startInsight('custom'));
+  $('insightCustomStart').addEventListener('click',startChat);
+  $('insightChatBack').addEventListener('click',() => showInsightPanel('insightHome'));
+  $('insightChatForm').addEventListener('submit',event => { event.preventDefault(); sendChat($('insightChatInput').value); });
   $('insightSettingsButton').addEventListener('click',() => { $('insightKeyInput').value = ''; $('insightKeyInput').placeholder = state.insightHasKey ? '已设置密钥；输入新密钥可替换' : '粘贴 DeepSeek API 密钥'; showInsightPanel('insightKeyPanel'); });
   $('insightKeyBack').addEventListener('click',() => showInsightPanel('insightHome'));
   $('insightKeySave').addEventListener('click',async () => {
@@ -377,7 +445,7 @@
   $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));
   $('switchAccount').addEventListener('click', async () => {
     try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin'}); } catch {}
-    state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
+    state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
   });
   $('accountForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -401,23 +469,55 @@
   function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
   $('mobileMenu').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
   $('mobileShade').addEventListener('click', closeSidebar);
+  function navigateBack() {
+    if (!$('modalLayer').hidden) { closeEditor(); return true; }
+    if (!$('insightLayer').hidden) {
+      if (!$('insightHome').hidden) closeInsight();
+      else showInsightPanel('insightHome');
+      return true;
+    }
+    if ($('sidebar').classList.contains('open')) { closeSidebar(); return true; }
+    if (!$('calendarPanel').hidden) { $('calendarPanel').hidden = true; return true; }
+    if (!$('accountLayer').hidden) return true;
+    return false;
+  }
+  window.linoteNavigateBack = navigateBack;
+  let lastSwipeAt = 0;
   function canSwipeOpen(event) {
-    return matchMedia('(max-width:620px)').matches && !$('sidebar').classList.contains('open') && $('modalLayer').hidden && $('insightLayer').hidden && $('accountLayer').hidden && !event.target.closest('input,textarea,select');
+    return matchMedia('(max-width:620px)').matches && (
+      !$('modalLayer').hidden || !$('insightLayer').hidden || $('sidebar').classList.contains('open') ||
+      ($('accountLayer').hidden && !event.target.closest('input,textarea,select'))
+    );
   }
   function swipeOpensSidebar(start, endX, endY) {
     if (!start) return false;
     const dx = start.x - endX, dy = start.y - endY;
-    return Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.3 && (dx > 0 || start.x < 32);
+    return Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.3 && (dx > 0 || start.x < 32);
   }
-  const main = document.querySelector('.main');
+  window.linoteHandleSwipe = () => {
+    if (!matchMedia('(max-width:620px)').matches) return;
+    if (Date.now() - lastSwipeAt < 700) return;
+    lastSwipeAt = Date.now();
+    if (!navigateBack() && $('accountLayer').hidden) openSidebar();
+  };
   let mainTouchStart = null;
-  main.addEventListener('touchstart', e => { mainTouchStart = canSwipeOpen(e) ? {x:e.touches[0].clientX,y:e.touches[0].clientY} : null; }, {passive:true});
-  main.addEventListener('touchend', e => { if (mainTouchStart && swipeOpensSidebar(mainTouchStart,e.changedTouches[0].clientX,e.changedTouches[0].clientY)) openSidebar(); mainTouchStart=null; }, {passive:true});
-  main.addEventListener('touchcancel', () => { mainTouchStart=null; }, {passive:true});
+  document.addEventListener('touchstart', e => { mainTouchStart = e.touches.length === 1 && canSwipeOpen(e) ? {x:e.touches[0].clientX,y:e.touches[0].clientY} : null; }, {passive:true,capture:true});
+  document.addEventListener('touchmove', e => {
+    if (mainTouchStart && e.touches.length === 1 && swipeOpensSidebar(mainTouchStart,e.touches[0].clientX,e.touches[0].clientY)) {
+      window.linoteHandleSwipe(); mainTouchStart = null;
+    }
+  }, {passive:true,capture:true});
+  document.addEventListener('touchend', () => { mainTouchStart=null; }, {passive:true,capture:true});
+  document.addEventListener('touchcancel', () => { mainTouchStart=null; }, {passive:true,capture:true});
   let mainPointerStart = null;
-  main.addEventListener('pointerdown', e => { mainPointerStart = canSwipeOpen(e) ? {x:e.clientX,y:e.clientY} : null; });
-  main.addEventListener('pointerup', e => { if (mainPointerStart && swipeOpensSidebar(mainPointerStart,e.clientX,e.clientY)) openSidebar(); mainPointerStart=null; });
-  main.addEventListener('pointercancel', () => { mainPointerStart=null; });
+  document.addEventListener('pointerdown', e => { mainPointerStart = canSwipeOpen(e) ? {x:e.clientX,y:e.clientY} : null; }, true);
+  document.addEventListener('pointermove', e => {
+    if (mainPointerStart && swipeOpensSidebar(mainPointerStart,e.clientX,e.clientY)) {
+      window.linoteHandleSwipe(); mainPointerStart = null;
+    }
+  }, true);
+  document.addEventListener('pointerup', () => { mainPointerStart=null; }, true);
+  document.addEventListener('pointercancel', () => { mainPointerStart=null; }, true);
   let touchStartX = null;
   $('sidebar').addEventListener('touchstart', e => { touchStartX = e.touches[0]?.clientX ?? null; }, {passive:true});
   $('sidebar').addEventListener('touchend', e => { if (touchStartX !== null && touchStartX - (e.changedTouches[0]?.clientX ?? touchStartX) > 65) closeSidebar(); touchStartX = null; }, {passive:true});
@@ -434,15 +534,20 @@
     if (e.key === 'Backspace' && !e.target.value && state.draftTags.length) { state.draftTags.pop(); renderDraftTags(); }
   });
   $('exportButton').addEventListener('click', exportNotes);
+  $('checkUpdate').addEventListener('click', () => {
+    if (/LinoteAndroid\/\d+/.test(navigator.userAgent)) window.location.href = 'linote://update';
+    else window.location.href = '/linote.apk';
+  });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (!$('insightLayer').hidden) closeInsight(); else if (!$('modalLayer').hidden) closeEditor(); else closeSidebar(); }
+    if (e.key === 'Escape') navigateBack();
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('searchInput').focus(); }
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
   fetch('/api/auth',{cache:'no-store',credentials:'same-origin'}).then(async response => {
-    if (!response.ok) throw new Error('未登录');
+    if (response.status === 401) { openAccount(); return; }
+    if (!response.ok) throw new Error('账号服务暂时不可用，请稍后刷新');
     const user = await response.json();
     state.account = user.username; $('accountName').textContent = user.username; localStorage.setItem(ACCOUNT_KEY,user.username); await loadFromAccount();
-  }).catch(openAccount);
+  }).catch(error => showToast(error.message || '连接失败，请稍后刷新'));
 })();
