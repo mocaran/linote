@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/3");
+        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/4");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
 

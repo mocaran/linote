@@ -534,6 +534,29 @@
     if (e.key === 'Backspace' && !e.target.value && state.draftTags.length) { state.draftTags.pop(); renderDraftTags(); }
   });
   $('exportButton').addEventListener('click', exportNotes);
+  $('importFlomoButton').addEventListener('click', () => {
+    if (!state.account) { openAccount(); return; }
+    $('importFlomoFile').value = '';
+    $('importFlomoFile').click();
+  });
+  $('importFlomoFile').addEventListener('change', async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2000000) { toast('导出文件不能超过 2 MB'); return; }
+    $('importFlomoButton').disabled = true;
+    $('importFlomoButton').textContent = '正在导入…';
+    try {
+      const response = await fetch('/api/notes/import-flomo', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({html:await file.text()}),credentials:'same-origin'});
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || '导入失败');
+      const data = await api('GET');
+      state.notes = data.notes;
+      state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
+      render(); closeSidebar();
+      toast(`已导入 ${result.imported} 条笔记，${result.alreadyPresent} 条已存在；共 ${result.tagCount} 个标签`);
+    } catch (error) { toast(error.message || '导入失败'); }
+    finally { $('importFlomoButton').disabled = false; $('importFlomoButton').textContent = '导入 flomo'; }
+  });
   $('checkUpdate').addEventListener('click', () => {
     if (/LinoteAndroid\/\d+/.test(navigator.userAgent)) window.location.href = 'linote://update';
     else window.location.href = '/linote.apk';
