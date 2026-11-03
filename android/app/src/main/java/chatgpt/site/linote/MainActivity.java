@@ -18,6 +18,7 @@ import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -37,6 +38,8 @@ public class MainActivity extends Activity {
     private float touchStartY;
     private boolean swipeHandled;
     private Uri pendingApkUri;
+    private ValueCallback<Uri[]> imagePickerCallback;
+    private static final int IMAGE_PICKER_REQUEST = 7;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +64,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/6");
+        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/7");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
 
@@ -91,7 +94,20 @@ public class MainActivity extends Activity {
             return false;
         });
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (imagePickerCallback != null) imagePickerCallback.onReceiveValue(null);
+                imagePickerCallback = callback;
+                Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.setType("image/*");
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                try { startActivityForResult(Intent.createChooser(pick, "选择图片"), IMAGE_PICKER_REQUEST); }
+                catch (Exception error) { imagePickerCallback.onReceiveValue(null); imagePickerCallback = null; return false; }
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -134,6 +150,22 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState == null) webView.loadUrl(HOME);
         else webView.restoreState(savedInstanceState);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != IMAGE_PICKER_REQUEST || imagePickerCallback == null) return;
+        Uri[] selected = null;
+        if (resultCode == RESULT_OK && data != null) {
+            if (data.getClipData() != null) {
+                int count = data.getClipData().getItemCount();
+                selected = new Uri[count];
+                for (int i = 0; i < count; i++) selected[i] = data.getClipData().getItemAt(i).getUri();
+            } else if (data.getData() != null) selected = new Uri[]{data.getData()};
+        }
+        imagePickerCallback.onReceiveValue(selected);
+        imagePickerCallback = null;
     }
 
     @Override

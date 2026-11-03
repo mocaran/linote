@@ -32,7 +32,8 @@ if ($LASTEXITCODE) { throw 'aapt2 link failed' }
 
 & $javac -encoding UTF-8 -source 17 -target 17 -classpath $platform -d $classes (Join-Path $PSScriptRoot 'app\src\main\java\chatgpt\site\linote\MainActivity.java')
 if ($LASTEXITCODE) { throw 'javac failed' }
-& $d8 --lib $platform --output $dex (Join-Path $classes 'chatgpt\site\linote\MainActivity.class') (Join-Path $classes 'chatgpt\site\linote\MainActivity$1.class') (Join-Path $classes 'chatgpt\site\linote\MainActivity$2.class')
+$activityClasses = @(Get-ChildItem -LiteralPath (Join-Path $classes 'chatgpt\site\linote') -Filter 'MainActivity*.class' -File | ForEach-Object FullName)
+& $d8 --lib $platform --output $dex $activityClasses
 if ($LASTEXITCODE) { throw 'd8 failed' }
 & $jar uf $unsigned -C $dex classes.dex
 if ($LASTEXITCODE) { throw 'APK assembly failed' }

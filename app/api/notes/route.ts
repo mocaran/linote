@@ -8,7 +8,7 @@ type Note = { id: string; body: string; tags: string[]; createdAt: string; updat
 function validateNote(value: unknown): Note | null {
   if (!value || typeof value !== "object") return null;
   const n = value as Record<string, unknown>;
-  if (typeof n.id !== "string" || !n.id || n.id.length > 100 || typeof n.body !== "string" || !n.body.trim() || n.body.length > 20000) return null;
+  if (typeof n.id !== "string" || !n.id || n.id.length > 100 || typeof n.body !== "string" || !n.body.trim() || n.body.length > 950000) return null;
   if (!Array.isArray(n.tags) || n.tags.length > 30 || n.tags.some(t => typeof t !== "string" || !t || t.length > 60)) return null;
   const createdAt = typeof n.createdAt === "string" && !Number.isNaN(Date.parse(n.createdAt)) ? n.createdAt : new Date().toISOString();
   const updatedAt = typeof n.updatedAt === "string" && !Number.isNaN(Date.parse(n.updatedAt)) ? n.updatedAt : createdAt;
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   try { value = await request.json(); } catch { return Response.json({error:"无效数据"}, {status:400}); }
   const note = validateNote(value);
   if (!note) return Response.json({error:"笔记内容无效"}, {status:400});
-  await ctx.db.prepare("INSERT INTO notes (user_id,id,body,tags,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET body=excluded.body,tags=excluded.tags,updated_at=excluded.updated_at").bind(ctx.userId,note.id,note.body,JSON.stringify(note.tags),note.createdAt,note.updatedAt).run();
+  await ctx.db.prepare("INSERT INTO notes (user_id,id,body,tags,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET body=excluded.body,tags=excluded.tags,updated_at=excluded.updated_at WHERE excluded.updated_at >= notes.updated_at").bind(ctx.userId,note.id,note.body,JSON.stringify(note.tags),note.createdAt,note.updatedAt).run();
   return Response.json({note});
 }
 

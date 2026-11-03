@@ -4,6 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "linote · 保卫个人史",
   description: "保卫个人史，记下每一个想法。",
+  icons: {icon:"/icon.png",apple:"/icon.png"},
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

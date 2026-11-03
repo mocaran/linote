@@ -6,13 +6,58 @@
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
+  const OFFLINE_DB = 'linote-offline-v1';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], insightHasKey: false, chatMessages: [], chatScope: '' };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
   function readAccount() { try { const value = normalizeAccount(localStorage.getItem(ACCOUNT_KEY) || ''); return validAccount(value) ? value : null; } catch { return null; } }
+  function offlineKey(kind, account = state.account) { return kind + ':' + encodeURIComponent(account || ''); }
+  function offlineDatabase() {
+    return new Promise((resolve,reject) => {
+      const request = indexedDB.open(OFFLINE_DB,1);
+      request.onupgradeneeded = () => request.result.createObjectStore('records');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+  async function offlineRecord(key, value) {
+    const db = await offlineDatabase();
+    try { return await new Promise((resolve,reject) => {
+      const transaction = db.transaction('records',value === undefined ? 'readonly' : 'readwrite');
+      const request = value === undefined ? transaction.objectStore('records').get(key) : transaction.objectStore('records').put(value,key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }); } finally { db.close(); }
+  }
+  async function cachedNotes(account = state.account) { try { return await offlineRecord(offlineKey('notes',account)) || []; } catch { return []; } }
+  async function cacheNotes() { await offlineRecord(offlineKey('notes'),state.notes); }
+  async function pendingChanges(account = state.account) { try { return await offlineRecord(offlineKey('pending',account)) || []; } catch { return []; } }
+  async function queueChange(change) {
+    const pending = (await pendingChanges()).filter(item => item.id !== change.id);
+    pending.push(change);
+    await offlineRecord(offlineKey('pending'),pending);
+  }
+  async function clearPending(id) {
+    const pending = await pendingChanges();
+    if (pending.some(item => item.id === id)) await offlineRecord(offlineKey('pending'),pending.filter(item => item.id !== id));
+  }
+  async function syncPending() {
+    const account = state.account;
+    const key = offlineKey('pending',account);
+    const pending = await pendingChanges(account);
+    for (const change of pending) {
+      try { await api(change.type === 'delete' ? 'DELETE' : 'POST',change.note,change.type === 'delete' ? change.id : undefined); }
+      catch (error) { if (error.status === 401) toast('登录已过期，请重新登录后同步'); return false; }
+      if (state.account !== account) return false;
+      const latest = await pendingChanges(account);
+      await offlineRecord(key,latest.filter(item => !(item.id === change.id && item.updatedAt === change.updatedAt)));
+    }
+    return true;
+  }
+  function canQueueOffline(error) { return !navigator.onLine || error instanceof TypeError || error.name === 'TimeoutError' || error.status >= 500; }
 
   function readNotes() {
     try {
@@ -24,16 +69,21 @@
     if (!state.account) throw new Error('请先登录');
     const headers = {};
     if (payload !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store',credentials:'same-origin'});
-    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '同步失败');
+    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(5000)});
+    if (!response.ok) { const error = new Error((await response.json().catch(() => ({}))).error || '同步失败'); error.status = response.status; throw error; }
     return response.json();
   }
   async function loadFromAccount() {
     if (!state.account) return;
     const account = state.account;
+    const cached = await cachedNotes(account);
+    if (state.account !== account) return;
+    if (cached.length) { state.notes = cached; render(); }
+    if (!navigator.onLine) { toast('离线模式 · 改动将在联网后同步'); return; }
     try {
+      if (!await syncPending()) { toast('待同步笔记已保存在此设备'); return; }
       if (localStorage.getItem(MIGRATION_KEY + '.' + account) !== 'done') {
-        const migrated = await fetch('/api/notes/migrate-legacy', {method:'POST',cache:'no-store',credentials:'same-origin'});
+        const migrated = await fetch('/api/notes/migrate-legacy', {method:'POST',cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
         if (migrated.ok) {
           const result = await migrated.json();
           if (result.available) localStorage.setItem(MIGRATION_KEY + '.' + account, 'done');
@@ -44,11 +94,12 @@
       const data = await api('GET');
       if (state.account !== account) return;
       state.notes = data.notes;
+      await cacheNotes();
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
       await syncInsightKey();
       if (oldNotes.length) toast('旧笔记已导入账号');
-    } catch (error) { toast(error.message || '笔记同步失败，请刷新重试'); }
+    } catch (error) { toast('暂时无法同步，已显示本机笔记'); }
   }
   function toast(message) {
     $('toast').textContent = message;
@@ -62,6 +113,48 @@
     if (text != null) node.textContent = text;
     return node;
   }
+  const IMAGE_MARKER = '\n\n<!--linote-images:';
+  function splitNoteBody(value) {
+    const at = value.lastIndexOf(IMAGE_MARKER);
+    if (at < 0 || !value.endsWith('-->')) return {text:value,images:[]};
+    try {
+      const images = JSON.parse(value.slice(at + IMAGE_MARKER.length,-3));
+      if (Array.isArray(images) && images.every(src => typeof src === 'string' && /^data:image\/jpeg;base64,/.test(src))) return {text:value.slice(0,at),images};
+    } catch {}
+    return {text:value,images:[]};
+  }
+  function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
+  function renderEditorImages() {
+    const box = $('editorImages'); box.replaceChildren();
+    state.draftImages.forEach((src,index) => {
+      const item = el('div','editor-image');
+      const img = el('img'); img.src = src; img.alt = '笔记图片 ' + (index+1);
+      const remove = el('button','','×'); remove.type='button'; remove.setAttribute('aria-label','移除图片 ' + (index+1));
+      remove.addEventListener('click',() => { state.draftImages.splice(index,1); renderEditorImages(); persistEditorDraft(); });
+      item.append(img,remove); box.append(item);
+    });
+  }
+  async function compressImage(file) {
+    if (!file.type.startsWith('image/') || file.size > 15000000) throw new Error('请选择小于 15 MB 的图片');
+    const bitmap = await createImageBitmap(file);
+    const ratio = Math.min(1, 1200 / Math.max(bitmap.width,bitmap.height));
+    const canvas = document.createElement('canvas'); canvas.width=Math.max(1,Math.round(bitmap.width*ratio)); canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
+    const context = canvas.getContext('2d'); context.fillStyle='#fff'; context.fillRect(0,0,canvas.width,canvas.height); context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close();
+    for (const quality of [.82,.7,.55,.4]) {
+      const data = canvas.toDataURL('image/jpeg',quality);
+      if (data.length <= 200000) return data;
+    }
+    throw new Error('图片压缩后仍太大，请换一张');
+  }
+  $('addImage').addEventListener('click',() => $('imageInput').click());
+  $('imageInput').addEventListener('change',async event => {
+    const files = [...event.target.files]; event.target.value = '';
+    if (state.draftImages.length + files.length > 4) { toast('一条笔记最多添加 4 张图片'); return; }
+    for (const file of files) {
+      try { state.draftImages.push(await compressImage(file)); renderEditorImages(); persistEditorDraft(); }
+      catch (error) { toast(error.message || '添加图片失败'); }
+    }
+  });
   function tagCounts() {
     const counts = new Map();
     state.notes.forEach(note => new Set(note.tags).forEach(tag => counts.set(tag, (counts.get(tag) || 0) + 1)));
@@ -124,7 +217,7 @@
   function filteredNotes() {
     if (state.reviewIds !== null) return state.reviewIds.map(id => state.notes.find(n => n.id === id)).filter(Boolean);
     const q = state.search.trim().toLocaleLowerCase();
-    return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || n.body.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || splitNoteBody(n.body).text.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
   }
   function renderNotes() {
     const notes = filteredNotes();
@@ -143,7 +236,10 @@
       const actions = el('div', 'note-actions');
       const edit = el('button', '', '编辑'); edit.type = 'button'; edit.setAttribute('aria-label', '编辑笔记'); edit.addEventListener('click', () => openEditor(note.id));
       const remove = el('button', '', '删除'); remove.type = 'button'; remove.setAttribute('aria-label', '删除笔记'); remove.addEventListener('click', () => deleteNote(note.id));
-      actions.append(edit, remove); top.append(actions); card.append(top, el('div', 'note-body', note.body));
+      actions.append(edit, remove); top.append(actions); card.append(top);
+      const parts = splitNoteBody(note.body);
+      if (parts.text) card.append(el('div', 'note-body', parts.text));
+      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
@@ -196,9 +292,9 @@
     const drafts = readDrafts().filter(item => item.id !== id);
     const body = $('noteBody').value;
     const tagInput = $('tagInput').value;
-    if (body || tagInput || state.draftTags.length) drafts.unshift({id,body,tagInput,tags:[...state.draftTags],updatedAt:new Date().toISOString()});
+    if (body || tagInput || state.draftTags.length || state.draftImages.length) drafts.unshift({id,body,tagInput,tags:[...state.draftTags],images:[...state.draftImages],updatedAt:new Date().toISOString()});
     writeDrafts(drafts);
-    $('editorHint').textContent = body || tagInput ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
+    $('editorHint').textContent = body || tagInput || state.draftImages.length ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
   }
   function clearEditorDraft(id) { writeDrafts(readDrafts().filter(item => item.id !== id)); }
   function renderSuggestions() {
@@ -213,11 +309,13 @@
     if (id === null && draft) id = draft.id;
     const note = state.notes.find(n => n.id === id);
     state.editing = note?.id || null;
+    const parts = note ? splitNoteBody(note.body) : {text:'',images:[]};
     state.draftTags = draft ? [...draft.tags] : note ? [...note.tags] : (state.tag ? [state.tag] : []);
+    state.draftImages = draft?.images ? [...draft.images] : [...parts.images];
     $('editorTitle').textContent = note ? '编辑笔记' : '写一条笔记';
-    $('noteBody').value = draft?.body ?? note?.body ?? '';
+    $('noteBody').value = draft?.body ?? parts.text;
     $('tagInput').value = draft?.tagInput || '';
-    renderDraftTags(); renderSuggestions();
+    renderDraftTags(); renderSuggestions(); renderEditorImages();
     $('modalLayer').hidden = false;
     $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
@@ -226,31 +324,47 @@
   function closeEditor() { persistEditorDraft(); $('modalLayer').hidden = true; document.body.style.overflow = ''; state.editing = null; }
   async function deleteNote(id) {
     if (!confirm('确定删除这条笔记吗？')) return;
-    try { await api('DELETE', undefined, id); } catch (error) { toast(error.message || '删除失败'); return; }
+    let queued = false;
+    try { await api('DELETE', undefined, id); }
+    catch (error) {
+      if (!canQueueOffline(error)) { toast(error.message || '删除失败'); return; }
+      try { await queueChange({type:'delete',id,updatedAt:new Date().toISOString()}); queued = true; }
+      catch { toast('本机存储不可用，删除失败'); return; }
+    }
+    if (!queued) await clearPending(id).catch(() => {});
     state.notes = state.notes.filter(n => n.id !== id);
+    try { await cacheNotes(); } catch { toast('本机缓存更新失败'); }
     if (state.reviewIds) state.reviewIds = state.reviewIds.filter(noteId => noteId !== id);
     if (state.tag && !tagCounts().has(state.tag)) state.tag = null;
-    render(); toast('笔记已删除');
+    render(); toast(queued ? '已在本机删除，联网后同步' : '笔记已删除');
   }
   async function saveNote(event) {
     event.preventDefault();
     const body = $('noteBody').value.trim();
-    if (!body) { $('noteBody').focus(); return; }
+    if (!body && !state.draftImages.length) { $('noteBody').focus(); return; }
     if ($('tagInput').value.trim()) addTag($('tagInput').value);
     const now = new Date().toISOString();
     let note;
     if (state.editing) {
       const existing = state.notes.find(n => n.id === state.editing);
       if (!existing) return;
-      note = { ...existing, body, tags:[...state.draftTags], updatedAt:now };
-    } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body, tags: [...state.draftTags], createdAt: now, updatedAt: now };
+      note = { ...existing, body:joinNoteBody(body,state.draftImages), tags:[...state.draftTags], updatedAt:now };
+    } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags: [...state.draftTags], createdAt: now, updatedAt: now };
     $('saveNote').disabled = true;
-    try { await api('POST', note); } catch (error) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
+    let queued = false;
+    try { await api('POST', note); }
+    catch (error) {
+      if (!canQueueOffline(error)) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
+      try { await queueChange({type:'save',id:note.id,note,updatedAt:now}); queued = true; }
+      catch { $('saveNote').disabled = false; toast('本机存储不可用，无法离线保存'); return; }
+    }
+    if (!queued) await clearPending(note.id).catch(() => {});
     $('saveNote').disabled = false;
     state.notes = [note, ...state.notes.filter(n => n.id !== note.id)];
+    try { await cacheNotes(); } catch { if (queued) { toast('本机缓存失败，请保留当前页面'); return; } }
     state.reviewIds = null;
     const draftId = state.editing || null;
-    closeEditor(); clearEditorDraft(draftId); render(); toast('笔记已保存');
+    closeEditor(); clearEditorDraft(draftId); render(); toast(queued ? '已保存在本机，联网后同步' : '笔记已保存');
   }
   $('noteBody').addEventListener('input', persistEditorDraft);
   $('tagInput').addEventListener('input', persistEditorDraft);
@@ -327,11 +441,33 @@
     try { await syncInsightKey(); } catch (error) { $('insightMessage').textContent = error.message || '密钥同步失败'; }
   }
   function closeInsight() { $('insightLayer').hidden = true; document.body.style.overflow = ''; }
-  function showInsightResult(insight) {
+  function renderAiText(container, content) {
+    container.replaceChildren();
+    for (const line of String(content || '').split(/\n/)) {
+      if (!line.trim()) { container.append(el('div','ai-spacer')); continue; }
+      const heading = line.match(/^\s*#{1,6}\s*(.+)$/);
+      const item = el(heading ? 'h4' : 'p',heading ? 'ai-heading' : 'ai-line');
+      const source = heading ? heading[1] : line.replace(/^\s*[-*]\s+/,'• ');
+      for (const part of source.split(/(\*\*[^*]+\*\*)/g)) {
+        if (part.startsWith('**') && part.endsWith('**')) item.append(el('strong','',part.slice(2,-2)));
+        else item.append(document.createTextNode(part));
+      }
+      container.append(item);
+    }
+  }
+  function renderReasoning(host, reasoning) {
+    host.querySelector('details')?.remove();
+    if (!reasoning) return;
+    const details = el('details','ai-reasoning');
+    details.append(el('summary','','查看 DeepSeek 思考过程'),el('pre','',reasoning));
+    host.append(details);
+  }
+  function showInsightResult(insight, reasoning = '') {
     showInsightPanel('insightResult');
     $('insightResultTitle').textContent = insight.title;
     $('insightResultMeta').textContent = insight.scope + ' · ' + insight.noteCount + ' 条笔记 · ' + formatDate(insight.createdAt);
-    $('insightResultBody').textContent = insight.content;
+    renderAiText($('insightResultBody'),insight.content);
+    renderReasoning($('insightResult'),reasoning);
   }
   async function startInsight(mode) {
     if (!state.insightHasKey) { showInsightPanel('insightKeyPanel'); $('insightMessage').textContent = '先设置 DeepSeek API 密钥'; return; }
@@ -340,21 +476,27 @@
     const scopeTag = $('insightScope').value;
     const bounds = insightDateBounds();
     if (!state.notes.some(note => { const time=Date.parse(note.createdAt); return (!scopeTag || note.tags.includes(scopeTag)) && (!bounds.startDate || time >= Date.parse(bounds.startDate)) && (!bounds.endDate || time < Date.parse(bounds.endDate)); })) { $('insightMessage').textContent = '所选范围内还没有笔记'; return; }
-    $('insightMessage').textContent = '正在阅读笔记并生成洞察…';
+    showInsightPanel('insightResult');
+    $('insightResultTitle').textContent = $('insightLayer').querySelector(`.insight-card[data-mode="${mode}"] strong`)?.textContent || 'AI 洞察';
+    $('insightResultMeta').textContent = bounds.label + ' · 正在分析笔记';
+    $('insightResultBody').textContent = '正在阅读笔记并生成洞察，请稍候…';
+    renderReasoning($('insightResult'),'');
     $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = true; });
     try {
       const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,customPrompt,scopeTag,...bounds,rangeLabel:bounds.label}),credentials:'same-origin'});
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '洞察失败');
-      showInsightResult(data.insight);
-    } catch (error) { $('insightMessage').textContent = error.message || '洞察失败，请稍后重试'; }
+      showInsightResult(data.insight,data.reasoning || '');
+    } catch (error) { $('insightResultBody').textContent = error.message || '洞察失败，请稍后重试'; }
     finally { $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = false; }); }
   }
   function renderChatMessages() {
     const box = $('insightChatMessages'); box.replaceChildren();
     state.chatMessages.forEach(message => {
       const item = el('div','insight-chat-message ' + message.role);
-      item.append(el('strong','',message.role === 'user' ? '你' : 'AI'),el('div','',message.content));
+      const content = el('div'); renderAiText(content,message.content);
+      item.append(el('strong','',message.role === 'user' ? '你' : 'AI'),content);
+      if (message.role === 'assistant') renderReasoning(item,message.reasoning || '');
       box.append(item);
     });
     box.scrollTop = box.scrollHeight;
@@ -364,18 +506,18 @@
     const history = state.chatMessages.slice(-12);
     const scopeTag = $('insightScope').value;
     const bounds = insightDateBounds();
-    state.chatMessages.push({role:'user',content:question.trim()}); renderChatMessages();
+    state.chatMessages.push({role:'user',content:question.trim()},{role:'assistant',content:'正在阅读笔记并思考…'}); renderChatMessages();
     $('insightChatSend').disabled = true;
     $('insightMessage').textContent = '正在阅读笔记并回复…';
     try {
       const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds}),credentials:'same-origin'});
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || '对话失败');
-      state.chatMessages.push({role:'assistant',content:data.answer}); renderChatMessages();
+      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:data.answer,reasoning:data.reasoning || ''}; renderChatMessages();
       $('insightChatInput').value = '';
       $('insightMessage').textContent = '';
     } catch (error) {
-      state.chatMessages.pop(); renderChatMessages();
+      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:error.message || '对话失败，请重试'}; renderChatMessages();
       $('insightMessage').textContent = error.message || '对话失败，请重试';
     } finally { $('insightChatSend').disabled = false; }
   }
@@ -445,7 +587,8 @@
   $('authLoginTab').addEventListener('click', () => setAuthMode('login'));
   $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));
   $('switchAccount').addEventListener('click', async () => {
-    try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin'}); } catch {}
+    try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {}
+    try { localStorage.removeItem(ACCOUNT_KEY); } catch {}
     state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
   });
   $('accountForm').addEventListener('submit', async e => {
@@ -578,10 +721,19 @@
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
-  fetch('/api/auth',{cache:'no-store',credentials:'same-origin'}).then(async response => {
-    if (response.status === 401) { openAccount(); return; }
-    if (!response.ok) throw new Error('账号服务暂时不可用，请稍后刷新');
-    const user = await response.json();
-    state.account = user.username; $('accountName').textContent = user.username; localStorage.setItem(ACCOUNT_KEY,user.username); await loadFromAccount();
-  }).catch(error => showToast(error.message || '连接失败，请稍后刷新'));
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  async function startApp() {
+    const remembered = readAccount();
+    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); render(); }
+    if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
+    try {
+      const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
+      if (response.status === 401) { openAccount(); return; }
+      if (!response.ok) throw new Error('账号服务暂时不可用');
+      const user = await response.json();
+      state.account = user.username; $('accountName').textContent = user.username; localStorage.setItem(ACCOUNT_KEY,user.username); await loadFromAccount();
+    } catch { if (!remembered) openAccount(); else toast('连接不可用 · 已打开本机笔记'); }
+  }
+  window.addEventListener('online',() => { if (state.account) loadFromAccount(); });
+  startApp();
 })();
