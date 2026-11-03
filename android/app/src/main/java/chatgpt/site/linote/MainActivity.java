@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/4");
+        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/5");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
 
@@ -77,8 +77,7 @@ public class MainActivity extends Activity {
                     if (!swipeHandled && event.getPointerCount() == 1) {
                         float dx = touchStartX - event.getX();
                         float dy = touchStartY - event.getY();
-                        if (Math.abs(dx) > swipeThreshold && Math.abs(dx) > Math.abs(dy) * 1.3f
-                                && (dx > 0 || touchStartX < 32 * getResources().getDisplayMetrics().density)) {
+                        if (dx > swipeThreshold && dx > Math.abs(dy) * 1.3f) {
                             swipeHandled = true;
                             webView.evaluateJavascript("window.linoteHandleSwipe && window.linoteHandleSwipe()", null);
                         }
@@ -145,7 +144,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        webView.evaluateJavascript("window.linoteNavigateBack ? window.linoteNavigateBack() : false", handled -> {
+        webView.evaluateJavascript("window.linoteSystemBack ? window.linoteSystemBack() : false", handled -> {
             if (!"true".equals(handled)) {
                 if (webView.canGoBack()) webView.goBack();
                 else MainActivity.super.onBackPressed();

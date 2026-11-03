@@ -483,6 +483,16 @@
   }
   window.linoteNavigateBack = navigateBack;
   let lastSwipeAt = 0;
+  window.linoteSystemBack = () => {
+    if (Date.now() - lastSwipeAt < 700) return true;
+    lastSwipeAt = Date.now();
+    if (navigateBack()) return true;
+    if (matchMedia('(max-width:620px)').matches && $('accountLayer').hidden) {
+      openSidebar();
+      return true;
+    }
+    return false;
+  };
   function canSwipeOpen(event) {
     return matchMedia('(max-width:620px)').matches && (
       !$('modalLayer').hidden || !$('insightLayer').hidden || $('sidebar').classList.contains('open') ||
@@ -492,7 +502,7 @@
   function swipeOpensSidebar(start, endX, endY) {
     if (!start) return false;
     const dx = start.x - endX, dy = start.y - endY;
-    return Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.3 && (dx > 0 || start.x < 32);
+    return dx > 56 && dx > Math.abs(dy) * 1.3;
   }
   window.linoteHandleSwipe = () => {
     if (!matchMedia('(max-width:620px)').matches) return;
