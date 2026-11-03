@@ -11,9 +11,21 @@
       return Array.isArray(value) ? value.filter(n => n && typeof n.id === 'string' && typeof n.body === 'string').map(n => ({ ...n, tags: Array.isArray(n.tags) ? n.tags.filter(t => typeof t === 'string') : [] })) : [];
     } catch { return []; }
   }
-  function persist() {
-    try { localStorage.setItem(KEY, JSON.stringify(state.notes)); return true; }
-    catch { toast('保存失败：浏览器存储空间不足或已被禁用'); return false; }
+  async function api(method, payload, id) {
+    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers: payload === undefined ? {} : {'Content-Type':'application/json'}, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store'});
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '同步失败');
+    return response.json();
+  }
+  async function loadFromAccount() {
+    try {
+      const oldNotes = readNotes();
+      if (oldNotes.length) await api('PUT', oldNotes);
+      const data = await api('GET');
+      state.notes = data.notes;
+      if (oldNotes.length) localStorage.removeItem(KEY);
+      render();
+      if (oldNotes.length) toast('旧笔记已导入账号');
+    } catch (error) { toast(error.message || '笔记同步失败，请刷新重试'); }
   }
   function toast(message) {
     $('toast').textContent = message;
@@ -41,7 +53,7 @@
     state.tag = tag;
     $('searchInput').value = '';
     state.search = '';
-    $('sidebar').classList.remove('open');
+    closeSidebar();
     render();
   }
   function formatDate(iso) {
@@ -63,6 +75,24 @@
       button.addEventListener('click', () => setTag(tag));
       list.append(button);
     });
+    renderCalendar();
+  }
+  function dayKey(date) { return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0'); }
+  function renderCalendar() {
+    const counts = new Map();
+    state.notes.forEach(n => { const d = new Date(n.createdAt); if (!isNaN(d.getTime())) { const key = dayKey(d); counts.set(key, (counts.get(key)||0)+1); } });
+    const today = new Date();
+    $('todayCount').textContent = '今日 ' + (counts.get(dayKey(today)) || 0) + ' 条';
+    $('totalStats').textContent = '共 ' + state.notes.length + ' 条笔记';
+    const box = $('miniCalendar'); box.replaceChildren();
+    for (let offset=34; offset>=0; offset--) {
+      const date = new Date(today.getFullYear(),today.getMonth(),today.getDate()-offset);
+      const count = counts.get(dayKey(date)) || 0;
+      const cell = el('span','calendar-cell level-' + Math.min(count,4));
+      cell.title = dayKey(date) + ' · ' + count + ' 条笔记';
+      cell.setAttribute('aria-label',cell.title);
+      box.append(cell);
+    }
   }
   function filteredNotes() {
     const q = state.search.trim().toLocaleLowerCase();
@@ -72,8 +102,6 @@
     const notes = filteredNotes();
     const title = state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
-    $('heading').textContent = title;
-    $('subtitle').textContent = state.tag ? '收集在这个话题下的每一个想法。' : '每一个小小的想法，都值得被好好记下。';
     $('resultCount').textContent = notes.length + ' 条笔记';
     $('filterLabel').textContent = state.search ? '搜索结果' : '按最近编辑排序';
     $('clearFilter').hidden = !state.tag && !state.search;
@@ -95,7 +123,7 @@
     });
     $('empty').hidden = notes.length > 0;
     $('emptyTitle').textContent = state.search ? '没有找到匹配的笔记' : state.tag ? '这个话题还没有笔记' : '从一条笔记开始';
-    $('emptyText').textContent = state.search ? '试试其他关键词或清除筛选。' : state.tag ? '写下新想法，并添加这个话题。' : '记录此刻的灵感，添加话题，让想法慢慢连接。';
+    $('emptyText').textContent = state.search ? '试试其他关键词或清除筛选。' : state.tag ? '写下新想法，并添加这个话题。' : '把稍纵即逝的想法留在这里。';
     $('emptyNew').textContent = state.search ? '清除搜索 ↗' : '写一条笔记 ↗';
   }
   function render() { renderSidebar(); renderNotes(); }
@@ -135,26 +163,29 @@
     setTimeout(() => $('noteBody').focus(), 0);
   }
   function closeEditor() { $('modalLayer').hidden = true; document.body.style.overflow = ''; state.editing = null; }
-  function deleteNote(id) {
+  async function deleteNote(id) {
     if (!confirm('确定删除这条笔记吗？')) return;
-    const previous = state.notes;
+    try { await api('DELETE', undefined, id); } catch (error) { toast(error.message || '删除失败'); return; }
     state.notes = state.notes.filter(n => n.id !== id);
-    if (!persist()) { state.notes = previous; return; }
     if (state.tag && !tagCounts().has(state.tag)) state.tag = null;
     render(); toast('笔记已删除');
   }
-  function saveNote(event) {
+  async function saveNote(event) {
     event.preventDefault();
     const body = $('noteBody').value.trim();
     if (!body) { $('noteBody').focus(); return; }
     if ($('tagInput').value.trim()) addTag($('tagInput').value);
-    const previous = state.notes.map(n => ({ ...n, tags: [...n.tags] }));
     const now = new Date().toISOString();
+    let note;
     if (state.editing) {
-      const note = state.notes.find(n => n.id === state.editing);
-      if (note) Object.assign(note, { body, tags: [...state.draftTags], updatedAt: now });
-    } else state.notes.unshift({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body, tags: [...state.draftTags], createdAt: now, updatedAt: now });
-    if (!persist()) { state.notes = previous; return; }
+      const existing = state.notes.find(n => n.id === state.editing);
+      if (!existing) return;
+      note = { ...existing, body, tags:[...state.draftTags], updatedAt:now };
+    } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body, tags: [...state.draftTags], createdAt: now, updatedAt: now };
+    $('saveNote').disabled = true;
+    try { await api('POST', note); } catch (error) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
+    $('saveNote').disabled = false;
+    state.notes = [note, ...state.notes.filter(n => n.id !== note.id)];
     closeEditor(); render(); toast('笔记已保存');
   }
   function exportNotes() {
@@ -168,7 +199,16 @@
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
   $('searchInput').addEventListener('input', e => { state.search = e.target.value; renderNotes(); });
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.search = ''; $('searchInput').value = ''; render(); });
-  $('mobileMenu').addEventListener('click', () => $('sidebar').classList.toggle('open'));
+  function openSidebar() { $('sidebar').classList.add('open'); $('mobileShade').hidden = false; }
+  function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
+  $('mobileMenu').addEventListener('click', () => $('sidebar').classList.contains('open') ? closeSidebar() : openSidebar());
+  $('mobileShade').addEventListener('click', closeSidebar);
+  let touchStartX = null;
+  $('sidebar').addEventListener('touchstart', e => { touchStartX = e.touches[0]?.clientX ?? null; }, {passive:true});
+  $('sidebar').addEventListener('touchend', e => { if (touchStartX !== null && touchStartX - (e.changedTouches[0]?.clientX ?? touchStartX) > 65) closeSidebar(); touchStartX = null; }, {passive:true});
+  let pointerStart = null;
+  $('sidebar').addEventListener('pointerdown', e => { pointerStart = {x:e.clientX,y:e.clientY}; });
+  $('sidebar').addEventListener('pointerup', e => { if (pointerStart && pointerStart.x-e.clientX > 65 && Math.abs(pointerStart.x-e.clientX) > Math.abs(pointerStart.y-e.clientY)) closeSidebar(); pointerStart = null; });
   $('closeEditor').addEventListener('click', closeEditor);
   $('cancelEditor').addEventListener('click', closeEditor);
   $('modalBackdrop').addEventListener('click', closeEditor);
@@ -180,9 +220,10 @@
   });
   $('exportButton').addEventListener('click', exportNotes);
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (!$('modalLayer').hidden) closeEditor(); else $('sidebar').classList.remove('open'); }
+    if (e.key === 'Escape') { if (!$('modalLayer').hidden) closeEditor(); else closeSidebar(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('searchInput').focus(); }
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
+  loadFromAccount();
 })();
