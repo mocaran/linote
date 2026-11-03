@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { accountIdFromRequest } from "../../../lib/account-id";
+import { sameOrigin, sessionUser } from "../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,22 +15,23 @@ function validateNote(value: unknown): Note | null {
   return { id:n.id, body:n.body.trim(), tags:[...new Set(n.tags as string[])], createdAt, updatedAt };
 }
 
-function context(request: Request) {
-  const userId = accountIdFromRequest(request);
-  if (!userId || !env.DB) return null;
-  return { db: env.DB, userId };
+async function context(request: Request) {
+  const user = await sessionUser(request);
+  if (!user || !env.DB) return null;
+  return { db: env.DB, userId: user.userId };
 }
 
 export async function GET(request: Request) {
-  const ctx = context(request);
-  if (!ctx) return Response.json({error:"请先输入有效的笔记编号"}, {status:400});
+  const ctx = await context(request);
+  if (!ctx) return Response.json({error:"请先登录"}, {status:401});
   const result = await ctx.db.prepare("SELECT id, body, tags, created_at, updated_at FROM notes WHERE user_id = ? ORDER BY updated_at DESC").bind(ctx.userId).all();
   return Response.json({notes: result.results.map(row => ({id:row.id, body:row.body, tags:JSON.parse(String(row.tags || "[]")), createdAt:row.created_at, updatedAt:row.updated_at}))}, {headers:{"Cache-Control":"no-store"}});
 }
 
 export async function POST(request: Request) {
-  const ctx = context(request);
-  if (!ctx) return Response.json({error:"请先输入有效的笔记编号"}, {status:400});
+  if (!sameOrigin(request)) return Response.json({error:"请求来源无效"},{status:403});
+  const ctx = await context(request);
+  if (!ctx) return Response.json({error:"请先登录"}, {status:401});
   let value: unknown;
   try { value = await request.json(); } catch { return Response.json({error:"无效数据"}, {status:400}); }
   const note = validateNote(value);
@@ -40,8 +41,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const ctx = context(request);
-  if (!ctx) return Response.json({error:"请先输入有效的笔记编号"}, {status:400});
+  if (!sameOrigin(request)) return Response.json({error:"请求来源无效"},{status:403});
+  const ctx = await context(request);
+  if (!ctx) return Response.json({error:"请先登录"}, {status:401});
   let value: unknown;
   try { value = await request.json(); } catch { return Response.json({error:"无效数据"}, {status:400}); }
   if (!Array.isArray(value) || value.length > 1000) return Response.json({error:"导入数量过多"}, {status:400});
@@ -53,8 +55,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const ctx = context(request);
-  if (!ctx) return Response.json({error:"请先输入有效的笔记编号"}, {status:400});
+  if (!sameOrigin(request)) return Response.json({error:"请求来源无效"},{status:403});
+  const ctx = await context(request);
+  if (!ctx) return Response.json({error:"请先登录"}, {status:401});
   const id = new URL(request.url).searchParams.get("id");
   if (!id || id.length > 100) return Response.json({error:"缺少笔记 ID"}, {status:400});
   await ctx.db.prepare("DELETE FROM notes WHERE user_id = ? AND id = ?").bind(ctx.userId,id).run();

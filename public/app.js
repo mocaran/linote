@@ -3,8 +3,9 @@
   const KEY = 'linote.notes.v1';
   const ACCOUNT_KEY = 'linote.account.v1';
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
+  const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: readAccount(), tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [] };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [] };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
@@ -18,10 +19,10 @@
     } catch { return []; }
   }
   async function api(method, payload, id) {
-    if (!state.account) throw new Error('请先输入笔记编号');
-    const headers = {'X-Linote-Account':encodeURIComponent(state.account)};
+    if (!state.account) throw new Error('请先登录');
+    const headers = {};
     if (payload !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store'});
+    const response = await fetch('/api/notes' + (id ? '?id=' + encodeURIComponent(id) : ''), {method, headers, body: payload === undefined ? undefined : JSON.stringify(payload), cache:'no-store',credentials:'same-origin'});
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '同步失败');
     return response.json();
   }
@@ -29,14 +30,14 @@
     if (!state.account) return;
     const account = state.account;
     try {
-      if (localStorage.getItem(MIGRATION_KEY) !== 'done') {
-        const migrated = await fetch('/api/notes/migrate-legacy', {method:'POST',headers:{'X-Linote-Account':encodeURIComponent(account)},cache:'no-store'});
+      if (localStorage.getItem(MIGRATION_KEY + '.' + account) !== 'done') {
+        const migrated = await fetch('/api/notes/migrate-legacy', {method:'POST',cache:'no-store',credentials:'same-origin'});
         if (migrated.ok) {
           const result = await migrated.json();
-          if (result.available) localStorage.setItem(MIGRATION_KEY, 'done');
+          if (result.available) localStorage.setItem(MIGRATION_KEY + '.' + account, 'done');
         }
       }
-      const oldNotes = readNotes();
+      const oldNotes = readAccount() === account ? readNotes() : [];
       if (oldNotes.length) await api('PUT', oldNotes);
       const data = await api('GET');
       if (state.account !== account) return;
@@ -124,7 +125,7 @@
   }
   function renderNotes() {
     const notes = filteredNotes();
-    const title = state.reviewIds !== null ? '随机回顾' : state.tag ? '#' + state.tag : '全部笔记';
+    const title = state.reviewIds !== null ? '回顾' : state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
     $('resultCount').textContent = notes.length + ' 条笔记';
     $('filterLabel').textContent = state.reviewIds !== null ? '从全部笔记中随机抽取' : state.search ? '搜索结果' : '按最近编辑排序';
@@ -242,17 +243,119 @@
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
   document.addEventListener('click', e => { if (!$('calendarPanel').hidden && !$('calendarPanel').contains(e.target) && !$('calendarToggle').contains(e.target)) { $('calendarPanel').hidden = true; $('calendarToggle').setAttribute('aria-expanded','false'); } });
-  function openAccount() { $('accountInput').value = state.account || ''; $('accountError').textContent = ''; $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
-  $('switchAccount').addEventListener('click', openAccount);
+  function insightStorageKey() { return INSIGHT_KEY + encodeURIComponent(state.account || ''); }
+  function readInsightKey() { try { return localStorage.getItem(insightStorageKey()) || ''; } catch { return ''; } }
+  function showInsightPanel(name) {
+    ['insightHome','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
+    $('insightMessage').textContent = '';
+  }
+  function refreshInsightScope() {
+    const select = $('insightScope'); const current = select.value; select.replaceChildren();
+    select.append(new Option('全部笔记', ''));
+    sortedTags().forEach(([tag,count]) => select.append(new Option('#' + tag + ' · ' + count + ' 条', tag)));
+    select.value = [...select.options].some(option => option.value === current) ? current : '';
+    refreshInsightCount();
+  }
+  function refreshInsightCount() {
+    const tag = $('insightScope').value;
+    const count = tag ? state.notes.filter(note => note.tags.includes(tag)).length : state.notes.length;
+    $('insightCount').textContent = count + ' 条笔记';
+  }
+  function openInsight() {
+    if (!state.account) { openAccount(); return; }
+    refreshInsightScope(); showInsightPanel('insightHome'); $('insightLayer').hidden = false;
+    document.body.style.overflow = 'hidden'; closeSidebar();
+  }
+  function closeInsight() { $('insightLayer').hidden = true; document.body.style.overflow = ''; }
+  function showInsightResult(insight) {
+    showInsightPanel('insightResult');
+    $('insightResultTitle').textContent = insight.title;
+    $('insightResultMeta').textContent = insight.scope + ' · ' + insight.noteCount + ' 条笔记 · ' + formatDate(insight.createdAt);
+    $('insightResultBody').textContent = insight.content;
+  }
+  async function startInsight(mode) {
+    const key = readInsightKey();
+    if (!key) { showInsightPanel('insightKeyPanel'); $('insightMessage').textContent = '先设置 DeepSeek API 密钥'; return; }
+    const customPrompt = mode === 'custom' ? $('insightCustomPrompt').value.trim() : '';
+    if (mode === 'custom' && !customPrompt) { $('insightMessage').textContent = '请先输入自定义视角'; return; }
+    const scopeTag = $('insightScope').value;
+    if (!state.notes.some(note => !scopeTag || note.tags.includes(scopeTag))) { $('insightMessage').textContent = '所选范围内还没有笔记'; return; }
+    $('insightMessage').textContent = '正在阅读笔记并生成洞察…';
+    $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = true; });
+    try {
+      const response = await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,mode,customPrompt,scopeTag}),credentials:'same-origin'});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '洞察失败');
+      showInsightResult(data.insight);
+    } catch (error) { $('insightMessage').textContent = error.message || '洞察失败，请稍后重试'; }
+    finally { $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = false; }); }
+  }
+  async function showInsightHistory() {
+    showInsightPanel('insightHistory'); $('insightHistoryList').textContent = '正在读取…';
+    try {
+      const response = await fetch('/api/insights',{credentials:'same-origin',cache:'no-store'});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '读取失败');
+      const list = $('insightHistoryList'); list.replaceChildren();
+      if (!data.insights.length) { list.textContent = '还没有洞察记录'; return; }
+      data.insights.forEach(insight => {
+        const button = el('button','insight-history-item'); button.type = 'button';
+        button.append(el('strong','',insight.title),el('span','',insight.scope + ' · ' + insight.noteCount + ' 条 · ' + formatDate(insight.createdAt)));
+        button.addEventListener('click',() => showInsightResult(insight)); list.append(button);
+      });
+    } catch(error) { $('insightHistoryList').textContent = error.message || '读取失败'; }
+  }
+  $('insightButton').addEventListener('click',openInsight);
+  $('insightClose').addEventListener('click',closeInsight);
+  $('insightBackdrop').addEventListener('click',closeInsight);
+  $('insightScope').addEventListener('change',refreshInsightCount);
+  $('insightLayer').querySelectorAll('.insight-card').forEach(button => button.addEventListener('click',() => startInsight(button.dataset.mode)));
+  $('insightCustomStart').addEventListener('click',() => startInsight('custom'));
+  $('insightSettingsButton').addEventListener('click',() => { $('insightKeyInput').value = readInsightKey(); showInsightPanel('insightKeyPanel'); });
+  $('insightKeyBack').addEventListener('click',() => showInsightPanel('insightHome'));
+  $('insightKeySave').addEventListener('click',() => {
+    const key = $('insightKeyInput').value.trim();
+    if (!key || key.length > 300) { $('insightMessage').textContent = '请输入有效的 DeepSeek API 密钥'; return; }
+    try { localStorage.setItem(insightStorageKey(),key); showInsightPanel('insightHome'); toast('密钥已保存在当前浏览器'); }
+    catch { $('insightMessage').textContent = '当前浏览器无法保存密钥'; }
+  });
+  $('insightKeyClear').addEventListener('click',() => { try { localStorage.removeItem(insightStorageKey()); } catch {} $('insightKeyInput').value = ''; $('insightMessage').textContent = '密钥已清除'; });
+  $('insightResultBack').addEventListener('click',() => showInsightPanel('insightHome'));
+  $('insightHistoryBack').addEventListener('click',() => showInsightPanel('insightHome'));
+  $('insightHistoryButton').addEventListener('click',showInsightHistory);
+  function setAuthMode(mode) {
+    state.authMode = mode;
+    $('authLoginTab').classList.toggle('active', mode === 'login');
+    $('authRegisterTab').classList.toggle('active', mode === 'register');
+    $('authSubmit').textContent = mode === 'register' ? '创建账号并进入' : '登录';
+    $('accountTitle').textContent = mode === 'register' ? '创建 linote 账号' : '登录 linote';
+    $('passwordInput').autoComplete = mode === 'register' ? 'new-password' : 'current-password';
+    $('accountError').textContent = '';
+  }
+  function openAccount() { $('accountInput').value = state.account || readAccount() || ''; $('passwordInput').value = ''; setAuthMode('login'); $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
+  $('authLoginTab').addEventListener('click', () => setAuthMode('login'));
+  $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));
+  $('switchAccount').addEventListener('click', async () => {
+    try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin'}); } catch {}
+    state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
+  });
   $('accountForm').addEventListener('submit', async e => {
     e.preventDefault();
     const account = normalizeAccount($('accountInput').value);
-    if (!validAccount(account)) { $('accountError').textContent = '请输入 1 至 32 个字符的编号'; return; }
+    const password = $('passwordInput').value;
+    if (!validAccount(account) || password.length < 8 || password.length > 128) { $('accountError').textContent = '账号需为 1 至 32 个字符，密码至少 8 位'; return; }
+    $('authSubmit').disabled = true;
+    try {
+      const response = await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,username:account,password}),credentials:'same-origin'});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '登录失败');
+    } catch (error) { $('authSubmit').disabled = false; $('accountError').textContent = error.message || '登录失败'; return; }
+    $('authSubmit').disabled = false;
     state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
-    localStorage.setItem(ACCOUNT_KEY, account);
     $('accountName').textContent = account;
     $('accountLayer').hidden = true;
     closeSidebar(); render(); await loadFromAccount();
+    localStorage.setItem(ACCOUNT_KEY, account);
   });
   function openSidebar() { $('sidebar').classList.add('open'); $('mobileShade').hidden = false; }
   function closeSidebar() { $('sidebar').classList.remove('open'); $('mobileShade').hidden = true; }
@@ -275,11 +378,14 @@
   });
   $('exportButton').addEventListener('click', exportNotes);
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (!$('modalLayer').hidden) closeEditor(); else closeSidebar(); }
+    if (e.key === 'Escape') { if (!$('insightLayer').hidden) closeInsight(); else if (!$('modalLayer').hidden) closeEditor(); else closeSidebar(); }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('searchInput').focus(); }
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
-  if (state.account) { $('accountName').textContent = state.account; loadFromAccount(); }
-  else openAccount();
+  fetch('/api/auth',{cache:'no-store',credentials:'same-origin'}).then(async response => {
+    if (!response.ok) throw new Error('未登录');
+    const user = await response.json();
+    state.account = user.username; $('accountName').textContent = user.username; localStorage.setItem(ACCOUNT_KEY,user.username); await loadFromAccount();
+  }).catch(openAccount);
 })();
