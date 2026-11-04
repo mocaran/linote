@@ -7,11 +7,11 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.16';
+  const APP_VERSION = '1.17';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
-  const imageDownloads = new Set();
+  const imageDownloads = new Map();
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
@@ -49,8 +49,11 @@
     try { return await new Promise((resolve,reject) => {
       const transaction = db.transaction('records',value === undefined ? 'readonly' : 'readwrite');
       const request = value === undefined ? transaction.objectStore('records').get(key) : transaction.objectStore('records').put(value,key);
-      request.onsuccess = () => resolve(request.result);
+      if (value === undefined) request.onsuccess = () => resolve(request.result);
+      else transaction.oncomplete = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('本机存储失败'));
     }); } finally { db.close(); }
   }
   async function deleteOfflineRecord(key) {
@@ -121,7 +124,7 @@
     const account = state.account;
     const cached = await cachedNotes(account);
     if (state.account !== account) return;
-    if (cached.length) { state.notes = cached; state.trash=await cachedTrash(account); await hydrateLocalImages(cached); render(); }
+    if (cached.length) { state.notes = cached; state.trash=await cachedTrash(account); await hydrateLocalImages([...cached,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]); render(); if (navigator.onLine) void cacheRemoteImages([...cached,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)],account); }
     if (!navigator.onLine) { toast('离线模式 · 改动将在联网后同步'); return; }
     try {
       if (!await syncPending()) { toast('待同步笔记已保存在此设备'); return; }
@@ -173,38 +176,73 @@
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
   function imageSource(ref) { return state.localImageUrls.get(ref) || ref; }
   function localImageKey(ref, account = state.account) { return offlineKey('image',account) + ':' + ref.slice('/api/images/'.length); }
+  function storedImageBlob(value) {
+    if (value instanceof Blob) return value;
+    if (value && value.bytes instanceof ArrayBuffer && /^image\/(?:jpeg|png|webp|gif)$/.test(value.mime)) return new Blob([value.bytes],{type:value.mime});
+    return null;
+  }
+  function showLocalImage(ref, blob, account) {
+    if (state.account !== account || state.localImageUrls.has(ref)) return;
+    const url=URL.createObjectURL(blob);
+    state.localImageUrls.set(ref,url);
+    document.querySelectorAll?.('img[data-image-ref]').forEach(img => {
+      if (img.dataset.imageRef === ref) img.src=url;
+    });
+    if ($('imageViewer')?.hidden === false && $('imageViewerImage')?.dataset.imageRef === ref) $('imageViewerImage').src=url;
+  }
   async function hydrateLocalImages(notes) {
     const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/') && !state.localImageUrls.has(ref)))];
     for (const ref of refs) {
-      try { const blob=await offlineRecord(localImageKey(ref)); if (blob instanceof Blob) state.localImageUrls.set(ref,URL.createObjectURL(blob)); }
+      try { const blob=storedImageBlob(await offlineRecord(localImageKey(ref))); if (blob) showLocalImage(ref,blob,state.account); }
       catch {}
     }
   }
+  async function cacheRemoteImage(ref, account = state.account) {
+    if (!ref.startsWith('/api/images/') || !navigator.onLine || state.account !== account) return false;
+    const key=localImageKey(ref,account);
+    if (imageDownloads.has(key)) return imageDownloads.get(key);
+    const job=(async () => {
+      let blob=storedImageBlob(await offlineRecord(key));
+      if (!blob) {
+        const response=await fetch(ref,{credentials:'same-origin',signal:AbortSignal.timeout(30000)});
+        if (!response.ok) throw new Error('图片下载失败');
+        const mime=(response.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase();
+        if (!/^image\/(?:jpeg|png|webp|gif)$/.test(mime)) throw new Error('图片格式无效');
+        const bytes=await response.arrayBuffer();
+        if (!bytes.byteLength || bytes.byteLength > 15000000) throw new Error('图片内容无效');
+        await offlineRecord(key,{mime,bytes});
+        blob=storedImageBlob(await offlineRecord(key));
+        if (!blob || blob.size !== bytes.byteLength) throw new Error('图片未能写入本机');
+      }
+      showLocalImage(ref,blob,account);
+      return true;
+    })().finally(() => imageDownloads.delete(key));
+    imageDownloads.set(key,job);
+    return job;
+  }
   async function cacheRemoteImages(notes, account) {
     const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/')))];
-    let saved = 0, failed = 0;
-    for (const ref of refs) {
-      if (state.account !== account || !navigator.onLine) break;
-      const key = localImageKey(ref,account);
-      if (state.localImageUrls.has(ref) || imageDownloads.has(key)) continue;
-      imageDownloads.add(key);
-      try {
-        let blob = await offlineRecord(key);
-        if (!(blob instanceof Blob)) {
-          const response = await fetch(ref,{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(120000)});
-          if (!response.ok) throw new Error('图片下载失败');
-          blob = await response.blob();
-          if (!blob.type.startsWith('image/') || !blob.size || blob.size > 15000000) throw new Error('图片内容无效');
-          await offlineRecord(key,blob);
-          saved++;
-        }
-        if (state.account === account) state.localImageUrls.set(ref,URL.createObjectURL(blob));
-      } catch { failed++; }
-      finally { imageDownloads.delete(key); }
+    let next=0, saved=0, failed=0;
+    await Promise.all(Array.from({length:Math.min(4,refs.length)},async () => {
+      while (next < refs.length && state.account === account && navigator.onLine) {
+        const ref=refs[next++];
+        if (state.localImageUrls.has(ref)) continue;
+        try { if (await cacheRemoteImage(ref,account)) saved++; }
+        catch { failed++; }
+      }
+    }));
+    if (state.account !== account || !navigator.onLine) return;
+    if (failed) toast(`${failed} 张图片未能离线保存，联网后会重试`);
+    else if (saved) toast(`${saved} 张图片已离线保存`);
+  }
+  function noteImage(img, ref) {
+    if (ref.startsWith('/api/images/')) {
+      img.dataset.imageRef=ref;
+      img.addEventListener('load',() => {
+        if (!state.localImageUrls.has(ref) && navigator.onLine) void cacheRemoteImage(ref).catch(() => {});
+      });
     }
-    if (state.account !== account) return;
-    if (failed) toast(`${failed} 张图片未能存入本机，请联网后重新打开 linote`);
-    else if (saved) toast(`${saved} 张图片已存入本机，可离线查看`);
+    img.src=imageSource(ref);
   }
   async function uploadNoteImages(note) {
     for (const ref of splitNoteBody(note.body).images) {
@@ -219,6 +257,7 @@
   }
   function openImageViewer(src, alt) {
     $('imageViewerImage').src = imageSource(src);
+    $('imageViewerImage').dataset.imageRef = src;
     $('imageViewerImage').alt = alt;
     $('imageViewer').classList.remove('zoomed');
     $('imageViewerZoom').textContent = '放大';
@@ -267,7 +306,7 @@
     const box = $('editorImages'); box.replaceChildren();
     state.draftImages.forEach((src,index) => {
       const item = el('div','editor-image');
-      const img = el('img'); img.src = imageSource(src); img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
+      const img = el('img'); noteImage(img,src); img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
       img.addEventListener('click',() => openImageViewer(src,img.alt));
       img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } });
       const remove = el('button','','×'); remove.type='button'; remove.setAttribute('aria-label','移除图片 ' + (index+1));
@@ -373,7 +412,7 @@
       if (entry.kind === 'note') {
         const parts=splitNoteBody(entry.item.body);
         if (parts.text) { const body=el('div','note-body preview'); renderTaggedText(body,parts.text); card.append(body); }
-        if (parts.images.length) { const img=el('img','trash-image'); img.src=imageSource(parts.images[0]); img.alt='已删除笔记的图片'; img.addEventListener('click',() => openImageViewer(parts.images[0],img.alt)); card.append(img); }
+        if (parts.images.length) { const img=el('img','trash-image'); noteImage(img,parts.images[0]); img.alt='已删除笔记的图片'; img.addEventListener('click',() => openImageViewer(parts.images[0],img.alt)); card.append(img); }
       } else { card.append(el('strong','trash-title',entry.item.title),el('div','trash-excerpt',entry.item.content.slice(0,220))); }
       return card;
     });
@@ -444,7 +483,7 @@
       const setExpanded = next => { expanded=next; state.noteOpen.set(note.id,next); card.dataset.expanded=String(next); card.className='note ' + (next ? 'expanded' : 'preview'); animateNoteBody(body,next); toggle.textContent=next ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(next)); };
       toggle.addEventListener('click',event => { event.stopPropagation(); setExpanded(card.dataset.expanded !== 'true'); });
       if (body) card.append(toggle);
-      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=imageSource(src); img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
+      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); noteImage(img,src); img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
@@ -1110,7 +1149,7 @@
   }
   async function startApp() {
     const remembered = await rememberedAccount();
-    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); await hydrateLocalImages([...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]); render(); }
+    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); const localItems=[...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]; await hydrateLocalImages(localItems); render(); if (navigator.onLine) void cacheRemoteImages(localItems,remembered); }
     if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});

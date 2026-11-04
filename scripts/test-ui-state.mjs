@@ -53,19 +53,23 @@ const makeRequest = value => {
   queueMicrotask(()=>request.onsuccess?.());
   return request;
 };
-const db = {transaction:()=>({objectStore:()=>({
-  get:key=>makeRequest(records.get(key)),
-  put:(value,key)=>{records.set(key,value);return makeRequest(undefined)},
-  getAllKeys:()=>makeRequest([...records.keys()]),
-})}),close(){}};
+const db = {transaction:()=>{
+  const transaction={objectStore:()=>({
+    get:key=>makeRequest(records.get(key)),
+    put:(value,key)=>{records.set(key,value);queueMicrotask(()=>transaction.oncomplete?.());return makeRequest(undefined)},
+    getAllKeys:()=>makeRequest([...records.keys()]),
+  })};
+  return transaction;
+},close(){}};
 const indexedDB={open:()=>makeRequest(db)};
 const localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
 const window={addEventListener(){},scrollY:120,scrollTo(x,y){this.scrollY=y}};
 const context={document,window,navigator:{userAgent:'LinoteAndroid/9',onLine:false},indexedDB,localStorage,
   matchMedia:()=>({matches:true}),fetch:async()=>{throw new TypeError('offline')},confirm:()=>true,crypto:globalThis.crypto,
   Option:class {constructor(text,value){this.text=text;this.value=value}},
-  setTimeout,clearTimeout,Date,Intl,Map,Set,Promise,JSON,Array,Number,String,Math,Blob,URL,console};
-vm.runInNewContext(fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8'),context);
+  setTimeout,clearTimeout,Date,Intl,Map,Set,Promise,JSON,Array,ArrayBuffer,Number,String,Math,Blob,URL,AbortSignal,console};
+const appSource=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+vm.runInNewContext(appSource.replace(/\}\)\(\);\s*$/, 'window.imageTest={state,renderNotes,hydrateLocalImages,imageSource};})();'),context);
 await new Promise(resolve=>setTimeout(resolve,10));
 assert.equal(dom.get('notes').children.length,2,'cached notes render without network');
 const imageNote=dom.get('notes').children[1];
@@ -158,4 +162,26 @@ const savedImageNote=records.get('notes:tester')[0];
 assert.match(savedImageNote.body,/\/api\/images\/[0-9a-f-]{36}/,'new images use an original-file reference');
 const imageKey=[...records.keys()].find(key=>key.startsWith('image:tester:'));
 assert.equal(await records.get(imageKey).text(),'original image bytes','original image bytes are stored without compression');
+const remoteRef='/api/images/11111111-1111-4111-8111-111111111111';
+const remoteBytes=new TextEncoder().encode('full resolution remote image').buffer;
+const remoteNote={id:'remote-note',body:`远端图片\n\n<!--linote-images:["${remoteRef}"]-->`,tags:[],createdAt:now,updatedAt:now};
+context.navigator.onLine=true;
+context.fetch=async url=>{
+  assert.equal(url,remoteRef);
+  return {ok:true,headers:{get:()=> 'image/png'},arrayBuffer:async()=>remoteBytes};
+};
+window.imageTest.state.notes=[remoteNote];
+window.imageTest.renderNotes();
+const remoteImage=dom.get('notes').children[0].children.find(child=>child.className==='note-images').children[0];
+await remoteImage.dispatch('load');
+await new Promise(resolve=>setTimeout(resolve,10));
+const remoteKey='image:tester:11111111-1111-4111-8111-111111111111';
+assert.equal(records.get(remoteKey)?.bytes.byteLength,remoteBytes.byteLength,'displayed remote image is saved locally at full resolution');
+window.imageTest.state.localImageUrls.clear();
+context.navigator.onLine=false;
+context.fetch=async()=>{throw new TypeError('offline')};
+await window.imageTest.hydrateLocalImages([remoteNote]);
+assert.match(window.imageTest.imageSource(remoteRef),/^blob:/,'another device can reopen the image offline');
+window.imageTest.renderNotes();
+assert.match(dom.get('notes').children[0].children.find(child=>child.className==='note-images').children[0].src,/^blob:/,'offline note renders its locally saved image');
 console.log('Offline UI and draft checks passed');
