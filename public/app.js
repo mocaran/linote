@@ -812,4 +812,5 @@
   }
   window.addEventListener('online',() => { if (state.account) loadFromAccount(); });
   startApp();
+  window.linoteReady = true;
 })();

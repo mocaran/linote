@@ -1,5 +1,5 @@
-import NotesPage from "./notes-page";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <NotesPage />;
+  redirect("/offline.html");
 }
