@@ -7,7 +7,7 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.14';
+  const APP_VERSION = '1.15';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
@@ -869,19 +869,27 @@
   }
   async function refreshWechat() {
     const data = await wechatApi('GET');
-    $('wechatSetup').hidden = !data.configured;
-    $('wechatCreate').hidden = !!data.configured;
-    if (data.configured) {
-      $('wechatCallback').value = data.callbackUrl;
-      $('wechatToken').value = data.token;
-      $('wechatLinked').textContent = data.linked ? '当前账号已有微信号绑定。' : '尚未绑定微信号。';
-    }
+    const channels = data.channels || [];
+    const container = $('wechatSetup');
+    container.replaceChildren();
+    channels.forEach((channel, index) => {
+      const card = document.createElement('section');
+      card.className = 'wechat-channel';
+      card.dataset.channelId = channel.channelId;
+      card.innerHTML = '<header><h3></h3><span class="wechat-linked"></span></header><label>服务器地址 URL</label><div class="wechat-copy-row"><input readonly aria-label="服务器地址 URL"><button type="button" data-action="copy" data-field="url">复制</button></div><label>令牌 Token</label><div class="wechat-copy-row"><input readonly aria-label="令牌 Token"><button type="button" data-action="copy" data-field="token">复制</button></div><button type="button" class="wechat-code-button" data-action="code">生成绑定口令</button><div class="wechat-code" hidden></div>';
+      card.querySelector('h3').textContent = `公众号 ${index + 1}`;
+      card.querySelector('.wechat-linked').textContent = `已绑定 ${channel.linkedCount} 个微信号`;
+      card.querySelectorAll('input')[0].value = channel.callbackUrl;
+      card.querySelectorAll('input')[1].value = channel.token;
+      container.appendChild(card);
+    });
+    $('wechatCreate').hidden = channels.length >= 2;
+    $('wechatCreate').textContent = channels.length ? '添加第二个公众号' : '生成接入配置';
   }
   async function openWechat() {
     if (!state.account) { openAccount(); return; }
     closeSidebar();
     $('wechatLayer').hidden = false;
-    $('wechatCode').hidden = true;
     $('wechatMessage').textContent = '正在读取接入配置…';
     try { await refreshWechat(); $('wechatMessage').textContent = ''; }
     catch (error) { $('wechatMessage').textContent = error.message || '读取失败'; }
@@ -892,19 +900,30 @@
   $('wechatBackdrop').addEventListener('click', closeWechat);
   $('wechatCreate').addEventListener('click', async () => {
     $('wechatCreate').disabled = true;
-    try { await wechatApi('POST',{action:'create'}); await refreshWechat(); $('wechatMessage').textContent = '配置已生成，请填写到公众号后台。'; }
+    try { await wechatApi('POST',{action:'create'}); await refreshWechat(); $('wechatMessage').textContent = '配置已生成，请把新公众号对应的 URL 和 Token 填入它的后台。'; }
     catch (error) { $('wechatMessage').textContent = error.message || '生成失败'; }
     finally { $('wechatCreate').disabled = false; }
   });
-  $('wechatCodeButton').addEventListener('click', async () => {
-    $('wechatCodeButton').disabled = true;
+  $('wechatSetup').addEventListener('click', async event => {
+    const button = event.target.closest('button[data-action]');
+    const card = button?.closest('.wechat-channel');
+    if (!button || !card) return;
+    if (button.dataset.action === 'copy') {
+      const value = card.querySelectorAll('input')[button.dataset.field === 'token' ? 1 : 0].value;
+      try { await navigator.clipboard.writeText(value); $('wechatMessage').textContent = '已复制完整内容。'; }
+      catch { const input = card.querySelectorAll('input')[button.dataset.field === 'token' ? 1 : 0]; input.select(); $('wechatMessage').textContent = '请复制已选中的完整内容。'; }
+      return;
+    }
+    if (button.dataset.action !== 'code') return;
+    button.disabled = true;
     try {
-      const result = await wechatApi('POST',{action:'code'});
-      $('wechatCode').textContent = `在公众号聊天中发送：绑定 ${result.code}（10 分钟内有效）`;
-      $('wechatCode').hidden = false;
+      const result = await wechatApi('POST',{action:'code',channelId:card.dataset.channelId});
+      const output = card.querySelector('.wechat-code');
+      output.textContent = `在公众号 ${[...$('wechatSetup').children].indexOf(card) + 1} 的聊天中发送：绑定 ${result.code}（10 分钟内有效）`;
+      output.hidden = false;
       $('wechatMessage').textContent = '';
     } catch (error) { $('wechatMessage').textContent = error.message || '生成失败'; }
-    finally { $('wechatCodeButton').disabled = false; }
+    finally { button.disabled = false; }
   });
   $('authLoginTab').addEventListener('click', () => setAuthMode('login'));
   $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));

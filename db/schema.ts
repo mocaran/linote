@@ -50,11 +50,11 @@ export const trashItems = sqliteTable("trash_items", {
 }, table => [primaryKey({columns:[table.userId,table.kind,table.id]}),index("trash_user_deleted_idx").on(table.userId,table.deletedAt)]);
 
 export const wechatChannels = sqliteTable("wechat_channels", {
-  userId: text("user_id").primaryKey(),
-  channelId: text("channel_id").notNull().unique(),
+  userId: text("user_id").notNull(),
+  channelId: text("channel_id").primaryKey(),
   verifyToken: text("verify_token").notNull(),
   createdAt: text("created_at").notNull(),
-});
+}, table => [index("wechat_channels_user_idx").on(table.userId)]);
 
 export const wechatBindCodes = sqliteTable("wechat_bind_codes", {
   channelId: text("channel_id").primaryKey(),
