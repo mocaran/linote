@@ -31,6 +31,8 @@ import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 
 public class MainActivity extends Activity {
@@ -67,7 +69,7 @@ public class MainActivity extends Activity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/8");
+        settings.setUserAgentString(settings.getUserAgentString() + " LinoteAndroid/9");
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
@@ -125,7 +127,7 @@ public class MainActivity extends Activity {
                 if (!HOST.equals(uri.getHost()) || !"https".equals(uri.getScheme())) return null;
                 String name;
                 String path = uri.getPath();
-                if ("/".equals(path) || "/offline.html".equals(path)) name = "offline.html";
+                if ("/".equals(path) || "/offline.html".equals(path)) name = "android-offline.html";
                 else if (path != null && path.matches("/(app\\.js|styles\\.css|overrides\\.css|features\\.css|icon\\.png|manifest\\.webmanifest)")) name = path.substring(1);
                 else return null;
                 try {
@@ -178,8 +180,12 @@ public class MainActivity extends Activity {
             }
         });
 
-        String boot = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><script>(async()=>{try{if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()))}if(window.caches){const ks=await caches.keys();await Promise.all(ks.filter(k=>k.startsWith('linote-shell-')).map(k=>caches.delete(k)))}}catch(e){}location.replace('/?app-shell=8')})()</script></body></html>";
-        webView.loadDataWithBaseURL(HOME, boot, "text/html", "UTF-8", HOME);
+        try (InputStream bundledPage = getAssets().open("android-offline.html")) {
+            String html = new String(readBytes(bundledPage), StandardCharsets.UTF_8);
+            webView.loadDataWithBaseURL(HOME, html, "text/html", "UTF-8", HOME);
+        } catch (Exception error) {
+            Toast.makeText(this, "无法打开应用页面，请重新安装", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -214,6 +220,14 @@ public class MainActivity extends Activity {
         });
     }
 
+    private static byte[] readBytes(InputStream input) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int count;
+        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+        return output.toByteArray();
+    }
+
     private void checkForUpdate() {
         Toast.makeText(this, "正在检查更新", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
@@ -223,7 +237,7 @@ public class MainActivity extends Activity {
                 connection.setConnectTimeout(10000);
                 connection.setReadTimeout(10000);
                 if (connection.getResponseCode() != 200) throw new Exception("版本信息暂不可用");
-                String json = new String(connection.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                String json = new String(readBytes(connection.getInputStream()), StandardCharsets.UTF_8);
                 JSONObject info = new JSONObject(json);
                 int latest = info.getInt("versionCode");
                 String versionName = info.getString("versionName");

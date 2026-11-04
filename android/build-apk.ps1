@@ -28,7 +28,7 @@ foreach ($path in @($aapt,$d8,$zipalign,$apksigner,$javac,$keytool,$jar,$platfor
 New-Item -ItemType Directory -Force -Path $out,$classes,$dex,$assets | Out-Null
 & node (Join-Path $webRoot 'scripts\generate-offline.mjs')
 if ($LASTEXITCODE) { throw 'Offline page generation failed' }
-foreach ($asset in @('offline.html','app.js','styles.css','overrides.css','features.css','icon.png','manifest.webmanifest')) {
+foreach ($asset in @('android-offline.html','offline.html','app.js','styles.css','overrides.css','features.css','icon.png','manifest.webmanifest')) {
     Copy-Item -LiteralPath (Join-Path $webRoot "public\$asset") -Destination (Join-Path $assets $asset) -Force
 }
 

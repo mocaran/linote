@@ -324,8 +324,7 @@
     matches.forEach(tag => { const b = el('button', '', '#' + tag); b.type = 'button'; b.addEventListener('click', () => { addTag(tag); $('tagInput').focus(); }); box.append(b); });
   }
   function openEditor(id = null) {
-    const draft = id === null ? readDrafts()[0] : readDrafts().find(item => item.id === id);
-    if (id === null && draft) id = draft.id;
+    const draft = id === null ? readDrafts().find(item => item.id === null) : readDrafts().find(item => item.id === id);
     const note = state.notes.find(n => n.id === id);
     state.editing = note?.id || null;
     const parts = note ? splitNoteBody(note.body) : {text:'',images:[]};
@@ -340,7 +339,13 @@
     document.body.style.overflow = 'hidden';
     setTimeout(() => $('noteBody').focus(), 0);
   }
-  function closeEditor() { persistEditorDraft(); $('modalLayer').hidden = true; document.body.style.overflow = ''; state.editing = null; }
+  function closeEditor() {
+    if (state.editing) clearEditorDraft(state.editing);
+    else persistEditorDraft();
+    $('modalLayer').hidden = true;
+    document.body.style.overflow = '';
+    state.editing = null;
+  }
   async function deleteNote(id) {
     if (!confirm('确定删除这条笔记吗？')) return;
     let queued = false;
@@ -781,7 +786,18 @@
     if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
-  if (!document.body.classList.contains('linote-android') && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    if (document.body.classList.contains('linote-android')) {
+      navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister()))).catch(() => {});
+      if ('caches' in window) caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('linote-shell-')).map(key => caches.delete(key)))).catch(() => {});
+    } else {
+      let reloadedForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!reloadedForUpdate) { reloadedForUpdate = true; location.reload(); }
+      });
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }
   async function startApp() {
     const remembered = await rememberedAccount();
     if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); render(); }
