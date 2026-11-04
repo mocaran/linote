@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     offset += rows.results.length;
   }
   if (!notes.length) return Response.json({error:"所选范围内还没有笔记"},{status:400});
-  const material = notes.map((note,index) => `${index+1}. [${note.created_at.slice(0,10)}] ${note.body.split("\n\n<!--linote-images:")[0] || "[图片笔记]"}`);
+  const material = notes.map((note,index) => `${index+1}. [${note.created_at.slice(0,10)}] ${note.body.split("<!--linote-images:")[0].trim() || "[图片笔记]"}`);
   let groups = chunks(material, 16000);
   const summarized = groups.length > 1;
   const generate = async (send?: StreamSender) => {

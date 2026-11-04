@@ -7,9 +7,9 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.11';
+  const APP_VERSION = '1.12';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', collapsed: new Set(), allCollapsed: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', noteOpen: new Map(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
@@ -135,17 +135,31 @@
   }
   const IMAGE_MARKER = '\n\n<!--linote-images:';
   function splitNoteBody(value) {
-    const at = value.lastIndexOf(IMAGE_MARKER);
-    if (at < 0 || !value.endsWith('-->')) return {text:value,images:[]};
+    const marker = '<!--linote-images:';
+    const at = value.lastIndexOf(marker);
+    const end = value.trimEnd();
+    if (at < 0 || !end.endsWith('-->')) return {text:value,images:[]};
     try {
-      const images = JSON.parse(value.slice(at + IMAGE_MARKER.length,-3));
-      if (Array.isArray(images) && images.every(src => typeof src === 'string' && /^data:image\/jpeg;base64,/.test(src))) return {text:value.slice(0,at),images};
+      const images = JSON.parse(end.slice(at + marker.length,-3));
+      if (Array.isArray(images) && images.every(src => typeof src === 'string' && /^data:image\/(?:jpeg|png|webp|gif);base64,/.test(src))) return {text:value.slice(0,at).replace(/\n{1,2}$/,''),images};
     } catch {}
     return {text:value,images:[]};
   }
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
-  // Inline topics end at whitespace or punctuation, with a short length limit so prose is not swallowed.
-  const TOPIC_PATTERN = /(^|[^#＃])([#＃])([^\s#＃，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’]{1,24})(?=$|[\s，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])/gu;
+  function openImageViewer(src, alt) {
+    $('imageViewerImage').src = src;
+    $('imageViewerImage').alt = alt;
+    $('imageViewer').hidden = false;
+    $('imageViewerClose').focus();
+  }
+  function closeImageViewer() {
+    $('imageViewer').hidden = true;
+    $('imageViewerImage').removeAttribute('src');
+  }
+  $('imageViewerBackdrop').addEventListener('click',closeImageViewer);
+  $('imageViewerClose').addEventListener('click',closeImageViewer);
+  // A topic can also be a single punctuation mark, such as #? or #！.
+  const TOPIC_PATTERN = /(^|[^#＃])([#＃])([^\s#＃，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’]{1,24}(?=$|[\s，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])|[，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])/gu;
   function inlineTopics(body) {
     const result = [], seen = new Set();
     for (const match of body.matchAll(TOPIC_PATTERN)) {
@@ -174,7 +188,9 @@
     const box = $('editorImages'); box.replaceChildren();
     state.draftImages.forEach((src,index) => {
       const item = el('div','editor-image');
-      const img = el('img'); img.src = src; img.alt = '笔记图片 ' + (index+1);
+      const img = el('img'); img.src = src; img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
+      img.addEventListener('click',() => openImageViewer(src,img.alt));
+      img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } });
       const remove = el('button','','×'); remove.type='button'; remove.setAttribute('aria-label','移除图片 ' + (index+1));
       remove.addEventListener('click',() => { state.draftImages.splice(index,1); renderEditorImages(); persistEditorDraft(); });
       item.append(img,remove); box.append(item);
@@ -272,34 +288,42 @@
     $('resultCount').textContent = notes.length + ' 条笔记';
     $('filterLabel').textContent = state.reviewIds !== null ? '从全部笔记中随机抽取' : state.search ? '搜索结果' : state.noteSort === 'created' ? '按发出日期排序 ▾' : '按最近编辑排序 ▾';
     $('filterLabel').disabled = state.reviewIds !== null || Boolean(state.search);
-    $('collapseAll').textContent = state.allCollapsed ? '全部展开' : '全部折叠';
-    $('collapseAll').setAttribute('aria-label',state.allCollapsed ? '展开全部笔记' : '折叠全部笔记');
+    $('collapseAll').textContent = state.allExpanded ? '全部收起' : '全部展开';
+    $('collapseAll').setAttribute('aria-label',state.allExpanded ? '收起全部笔记至七行' : '展开全部笔记');
     $('reviewAgain').hidden = state.reviewIds === null;
     $('clearFilter').hidden = !state.tag && !state.search && state.reviewIds === null;
     $('clearFilter').textContent = state.reviewIds !== null ? '退出回顾 ×' : '清除筛选 ×';
     const list = $('notes'); list.replaceChildren();
     notes.forEach(note => {
-      const collapsed = state.collapsed.has(note.id);
-      const card = el('article', 'note' + (collapsed ? ' collapsed' : ''));
+      const expanded = state.noteOpen.has(note.id) ? state.noteOpen.get(note.id) : state.allExpanded;
+      const card = el('article', 'note' + (expanded ? ' expanded' : ' preview'));
       const top = el('div', 'note-top');
       top.append(el('time', '', formatDate(note.createdAt)));
-      const toggle=el('button','note-toggle',collapsed ? '展开 ▾' : '收起 ▴'); toggle.type='button'; toggle.setAttribute('aria-expanded',String(!collapsed));
-      toggle.addEventListener('click',event => { event.stopPropagation(); state.collapsed.has(note.id) ? state.collapsed.delete(note.id) : state.collapsed.add(note.id); renderNotes(); });
-      top.append(toggle);
       const actions = el('div', 'note-actions');
       const edit = el('button', '', '编辑'); edit.type = 'button'; edit.setAttribute('aria-label', '编辑笔记'); edit.addEventListener('click', () => openEditor(note.id));
       const remove = el('button', '', '删除'); remove.type = 'button'; remove.setAttribute('aria-label', '删除笔记'); remove.addEventListener('click', () => deleteNote(note.id));
       actions.append(edit, remove); top.append(actions); card.append(top);
       const parts = splitNoteBody(note.body);
-      if (parts.text) { const body=el('div','note-body'); renderTaggedText(body,parts.text); card.append(body); }
-      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; images.append(img); }); card.append(images); }
+      let body;
+      if (parts.text) { body=el('div','note-body' + (expanded ? '' : ' preview')); renderTaggedText(body,parts.text); card.append(body); }
+      const toggle=el('button','note-toggle',expanded ? '收起' : '展开'); toggle.type='button'; toggle.hidden=true; toggle.setAttribute('aria-expanded',String(expanded));
+      toggle.addEventListener('click',event => { event.stopPropagation(); state.noteOpen.set(note.id,!expanded); renderNotes(); });
+      if (body) card.append(toggle);
+      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
         card.append(tags);
       }
-      card.addEventListener('click',event => { if (event.target.closest('button')) return; state.collapsed.has(note.id) ? state.collapsed.delete(note.id) : state.collapsed.add(note.id); renderNotes(); });
+      card.addEventListener('click',event => { if (event.target.closest('button,img') || toggle.hidden) return; state.noteOpen.set(note.id,!expanded); renderNotes(); });
       list.append(card);
+      if (body) {
+        const fullHeight = body.scrollHeight;
+        if (typeof fullHeight === 'number') {
+          const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
+          toggle.hidden = fullHeight <= lineHeight * 7 + 2;
+        }
+      }
     });
     $('empty').hidden = notes.length > 0;
     $('emptyNew').textContent = state.search || state.reviewIds !== null ? '查看全部笔记 ↗' : '写一条笔记 ↗';
@@ -419,7 +443,7 @@
   $('reviewAgain').addEventListener('click', chooseReview);
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
   $('filterLabel').addEventListener('click',() => { state.noteSort=state.noteSort === 'updated' ? 'created' : 'updated'; renderNotes(); });
-  $('collapseAll').addEventListener('click',() => { state.allCollapsed=!state.allCollapsed; state.collapsed=state.allCollapsed ? new Set(filteredNotes().map(note => note.id)) : new Set(); renderNotes(); });
+  $('collapseAll').addEventListener('click',() => { state.allExpanded=!state.allExpanded; state.noteOpen.clear(); renderNotes(); });
   $('searchInput').addEventListener('input', e => { state.reviewIds = null; state.search = e.target.value; render(); });
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
@@ -753,6 +777,7 @@
   $('mobileShade').addEventListener('touchstart',closeSidebar,{passive:true});
   document.addEventListener('pointerdown',e => { if ($('sidebar').classList.contains('open') && !$('sidebar').contains(e.target) && !$('mobileMenu').contains(e.target)) closeSidebar(); },true);
   function navigateBack() {
+    if (!$('imageViewer').hidden) { closeImageViewer(); return true; }
     if (!$('modalLayer').hidden) { closeEditor(); return true; }
     if (!$('wechatLayer').hidden) { closeWechat(); return true; }
     if (!$('insightLayer').hidden) {
