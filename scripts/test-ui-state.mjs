@@ -68,7 +68,7 @@ assert.equal(dom.get('notes').children.length,2,'cached notes render without net
 
 for (let index=0;index<2;index++) {
   const card=dom.get('notes').children[index];
-  const edit=card.children[0].children[1].children[0];
+  const edit=card.children[0].children[2].children[0];
   await edit.dispatch('click');
   assert.equal(dom.get('editorTitle').textContent,'编辑笔记');
   await dom.get('cancelEditor').dispatch('click');
@@ -83,11 +83,16 @@ assert.equal(dom.get('noteBody').value,'未发的新草稿');
 await dom.get('cancelEditor').dispatch('click');
 await dom.get('newNoteSidebar').dispatch('click');
 assert.equal(dom.get('noteBody').value,'未发的新草稿','new-note draft survives close');
-dom.get('noteBody').value='离线发表';
+dom.get('noteBody').value='离线发表 #记录\n下一段仍是正文';
 await dom.get('noteForm').dispatch('submit');
 assert.equal(dom.get('modalLayer').hidden,true);
 assert.equal(records.get('notes:tester').length,3,'offline note is published locally');
 assert.equal(records.get('pending:tester').length,1,'offline note is queued for sync');
+assert.equal(JSON.stringify(records.get('notes:tester')[0].tags),JSON.stringify(['记录']),'inline topic is classified without absorbing later text');
+await dom.get('collapseAll').dispatch('click');
+assert.equal(dom.get('notes').children[0].className.includes('collapsed'),true,'bulk collapse works');
+await dom.get('filterLabel').dispatch('click');
+assert.equal(dom.get('filterLabel').textContent,'按发出日期排序 ▾','feed sort switches');
 await dom.get('reviewNotes').dispatch('click');
 assert.equal(dom.get('pageTitle').textContent,'回顾');
 await dom.get('allNotes').dispatch('click');

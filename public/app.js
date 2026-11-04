@@ -7,9 +7,9 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.10';
+  const APP_VERSION = '1.11';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
+  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', collapsed: new Set(), allCollapsed: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
@@ -144,6 +144,32 @@
     return {text:value,images:[]};
   }
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
+  // Inline topics end at whitespace or punctuation, with a short length limit so prose is not swallowed.
+  const TOPIC_PATTERN = /(^|[^#＃])([#＃])([^\s#＃，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’]{1,24})(?=$|[\s，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])/gu;
+  function inlineTopics(body) {
+    const result = [], seen = new Set();
+    for (const match of body.matchAll(TOPIC_PATTERN)) {
+      const tag = normalizeTag(match[3]);
+      if (tag && !seen.has(tag.toLocaleLowerCase())) { seen.add(tag.toLocaleLowerCase()); result.push(tag); }
+    }
+    return result;
+  }
+  function renderTaggedText(target, body) {
+    target.replaceChildren();
+    let from = 0;
+    for (const match of body.matchAll(TOPIC_PATTERN)) {
+      const start = match.index + match[1].length;
+      target.append(document.createTextNode(body.slice(from,start)));
+      target.append(el('span','inline-topic',body.slice(start,start+match[2].length+match[3].length)));
+      from = start+match[2].length+match[3].length;
+    }
+    target.append(document.createTextNode(body.slice(from)));
+  }
+  function renderEditorHighlight() {
+    const input=$('noteBody'), mirror=$('noteHighlight');
+    renderTaggedText(mirror,input.value+'\n');
+    mirror.scrollTop=input.scrollTop;
+  }
   function renderEditorImages() {
     const box = $('editorImages'); box.replaceChildren();
     state.draftImages.forEach((src,index) => {
@@ -237,34 +263,42 @@
   function filteredNotes() {
     if (state.reviewIds !== null) return state.reviewIds.map(id => state.notes.find(n => n.id === id)).filter(Boolean);
     const q = state.search.trim().toLocaleLowerCase();
-    return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || splitNoteBody(n.body).text.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+    return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || splitNoteBody(n.body).text.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(state.noteSort === 'created' ? b.createdAt : b.updatedAt || b.createdAt) - new Date(state.noteSort === 'created' ? a.createdAt : a.updatedAt || a.createdAt));
   }
   function renderNotes() {
     const notes = filteredNotes();
     const title = state.reviewIds !== null ? '回顾' : state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
     $('resultCount').textContent = notes.length + ' 条笔记';
-    $('filterLabel').textContent = state.reviewIds !== null ? '从全部笔记中随机抽取' : state.search ? '搜索结果' : '按最近编辑排序';
+    $('filterLabel').textContent = state.reviewIds !== null ? '从全部笔记中随机抽取' : state.search ? '搜索结果' : state.noteSort === 'created' ? '按发出日期排序 ▾' : '按最近编辑排序 ▾';
+    $('filterLabel').disabled = state.reviewIds !== null || Boolean(state.search);
+    $('collapseAll').textContent = state.allCollapsed ? '全部展开' : '全部折叠';
+    $('collapseAll').setAttribute('aria-label',state.allCollapsed ? '展开全部笔记' : '折叠全部笔记');
     $('reviewAgain').hidden = state.reviewIds === null;
     $('clearFilter').hidden = !state.tag && !state.search && state.reviewIds === null;
     $('clearFilter').textContent = state.reviewIds !== null ? '退出回顾 ×' : '清除筛选 ×';
     const list = $('notes'); list.replaceChildren();
     notes.forEach(note => {
-      const card = el('article', 'note');
+      const collapsed = state.collapsed.has(note.id);
+      const card = el('article', 'note' + (collapsed ? ' collapsed' : ''));
       const top = el('div', 'note-top');
       top.append(el('time', '', formatDate(note.createdAt)));
+      const toggle=el('button','note-toggle',collapsed ? '展开 ▾' : '收起 ▴'); toggle.type='button'; toggle.setAttribute('aria-expanded',String(!collapsed));
+      toggle.addEventListener('click',event => { event.stopPropagation(); state.collapsed.has(note.id) ? state.collapsed.delete(note.id) : state.collapsed.add(note.id); renderNotes(); });
+      top.append(toggle);
       const actions = el('div', 'note-actions');
       const edit = el('button', '', '编辑'); edit.type = 'button'; edit.setAttribute('aria-label', '编辑笔记'); edit.addEventListener('click', () => openEditor(note.id));
       const remove = el('button', '', '删除'); remove.type = 'button'; remove.setAttribute('aria-label', '删除笔记'); remove.addEventListener('click', () => deleteNote(note.id));
       actions.append(edit, remove); top.append(actions); card.append(top);
       const parts = splitNoteBody(note.body);
-      if (parts.text) card.append(el('div', 'note-body', parts.text));
+      if (parts.text) { const body=el('div','note-body'); renderTaggedText(body,parts.text); card.append(body); }
       if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
         card.append(tags);
       }
+      card.addEventListener('click',event => { if (event.target.closest('button')) return; state.collapsed.has(note.id) ? state.collapsed.delete(note.id) : state.collapsed.add(note.id); renderNotes(); });
       list.append(card);
     });
     $('empty').hidden = notes.length > 0;
@@ -291,21 +325,6 @@
     closeSidebar(); render();
   }
   function normalizeTag(raw) { return raw.trim().replace(/^#+/, '').replace(/\s*\/\s*/g, '/').replace(/\s+/g, ' ').replace(/^\/|\/$/g, '').slice(0,60); }
-  function addTag(raw) {
-    const tag = normalizeTag(raw);
-    if (tag && !state.draftTags.some(t => t.toLocaleLowerCase() === tag.toLocaleLowerCase())) state.draftTags.push(tag);
-    $('tagInput').value = '';
-    renderDraftTags(); renderSuggestions(); persistEditorDraft();
-  }
-  function renderDraftTags() {
-    const container = $('selectedTags'); container.replaceChildren();
-    state.draftTags.forEach(tag => {
-      const chip = el('span', 'selected-tag', '#' + tag);
-      const remove = el('button', '', '×'); remove.type = 'button'; remove.setAttribute('aria-label', '移除话题 ' + tag);
-      remove.addEventListener('click', () => { state.draftTags = state.draftTags.filter(t => t !== tag); renderDraftTags(); renderSuggestions(); persistEditorDraft(); });
-      chip.append(remove); container.append(chip);
-    });
-  }
   function draftStorageKey() { return DRAFT_KEY + encodeURIComponent(state.account || 'guest'); }
   function readDrafts() {
     try { const saved = JSON.parse(localStorage.getItem(draftStorageKey()) || '[]'); return Array.isArray(saved) ? saved.filter(item => item && typeof item.body === 'string' && (item.id === null || typeof item.id === 'string')).map(item => ({...item,tags:Array.isArray(item.tags) ? item.tags : []})) : []; }
@@ -317,30 +336,21 @@
     const id = state.editing || null;
     const drafts = readDrafts().filter(item => item.id !== id);
     const body = $('noteBody').value;
-    const tagInput = $('tagInput').value;
-    if (body || tagInput || state.draftTags.length || state.draftImages.length) drafts.unshift({id,body,tagInput,tags:[...state.draftTags],images:[...state.draftImages],updatedAt:new Date().toISOString()});
+    if (body || state.draftImages.length) drafts.unshift({id,body,images:[...state.draftImages],updatedAt:new Date().toISOString()});
     writeDrafts(drafts);
-    $('editorHint').textContent = body || tagInput || state.draftImages.length ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
+    $('editorHint').textContent = body || state.draftImages.length ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
   }
   function clearEditorDraft(id) { writeDrafts(readDrafts().filter(item => item.id !== id)); }
-  function renderSuggestions() {
-    const input = $('tagInput').value.trim().replace(/^#/, '').toLocaleLowerCase();
-    const matches = [...tagCounts().keys()].filter(t => !state.draftTags.includes(t) && (!input || t.toLocaleLowerCase().includes(input))).slice(0,6);
-    const box = $('tagSuggestions'); box.replaceChildren();
-    box.hidden = !input || matches.length === 0;
-    matches.forEach(tag => { const b = el('button', '', '#' + tag); b.type = 'button'; b.addEventListener('click', () => { addTag(tag); $('tagInput').focus(); }); box.append(b); });
-  }
   function openEditor(id = null) {
     const draft = id === null ? readDrafts().find(item => item.id === null) : readDrafts().find(item => item.id === id);
     const note = state.notes.find(n => n.id === id);
     state.editing = note?.id || null;
     const parts = note ? splitNoteBody(note.body) : {text:'',images:[]};
-    state.draftTags = draft ? [...draft.tags] : note ? [...note.tags] : (state.tag ? [state.tag] : []);
     state.draftImages = draft?.images ? [...draft.images] : [...parts.images];
     $('editorTitle').textContent = note ? '编辑笔记' : '写一条笔记';
-    $('noteBody').value = draft?.body ?? parts.text;
-    $('tagInput').value = draft?.tagInput || '';
-    renderDraftTags(); renderSuggestions(); renderEditorImages();
+    const legacyTags = note ? note.tags.filter(tag => !inlineTopics(parts.text).includes(tag)) : [];
+    $('noteBody').value = draft?.body ?? (parts.text + (legacyTags.length ? '\n' + legacyTags.map(tag => '#' + tag).join(' ') : '') + (!note && state.tag ? '\n#' + state.tag : ''));
+    renderEditorHighlight(); renderEditorImages();
     $('modalLayer').hidden = false;
     $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
@@ -373,14 +383,13 @@
     event.preventDefault();
     const body = $('noteBody').value.trim();
     if (!body && !state.draftImages.length) { $('noteBody').focus(); return; }
-    if ($('tagInput').value.trim()) addTag($('tagInput').value);
     const now = new Date().toISOString();
     let note;
     if (state.editing) {
       const existing = state.notes.find(n => n.id === state.editing);
       if (!existing) return;
-      note = { ...existing, body:joinNoteBody(body,state.draftImages), tags:[...state.draftTags], updatedAt:now };
-    } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags: [...state.draftTags], createdAt: now, updatedAt: now };
+      note = { ...existing, body:joinNoteBody(body,state.draftImages), tags:inlineTopics(body), updatedAt:now };
+    } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags:inlineTopics(body), createdAt: now, updatedAt: now };
     $('saveNote').disabled = true;
     let queued = false;
     try { await api('POST', note); }
@@ -397,8 +406,8 @@
     const draftId = state.editing || null;
     closeEditor(); clearEditorDraft(draftId); render(); toast(queued ? '已保存在本机，联网后同步' : '笔记已保存');
   }
-  $('noteBody').addEventListener('input', persistEditorDraft);
-  $('tagInput').addEventListener('input', persistEditorDraft);
+  $('noteBody').addEventListener('input', () => { renderEditorHighlight(); persistEditorDraft(); });
+  $('noteBody').addEventListener('scroll',renderEditorHighlight);
   function exportNotes() {
     if (!state.account) { openAccount(); return; }
     const link = document.createElement('a');
@@ -409,6 +418,8 @@
   $('reviewNotes').addEventListener('click', chooseReview);
   $('reviewAgain').addEventListener('click', chooseReview);
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
+  $('filterLabel').addEventListener('click',() => { state.noteSort=state.noteSort === 'updated' ? 'created' : 'updated'; renderNotes(); });
+  $('collapseAll').addEventListener('click',() => { state.allCollapsed=!state.allCollapsed; state.collapsed=state.allCollapsed ? new Set(filteredNotes().map(note => note.id)) : new Set(); renderNotes(); });
   $('searchInput').addEventListener('input', e => { state.reviewIds = null; state.search = e.target.value; render(); });
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
@@ -432,6 +443,7 @@
   }
   function showInsightPanel(name) {
     ['insightHome','insightChat','insightRangePanel','insightKeyPanel','insightResult','insightHistory'].forEach(id => { $(id).hidden = id !== name; });
+    $('insightDialog').classList.toggle('chat-expanded',name === 'insightChat');
     $('insightMessage').textContent = '';
   }
   function refreshInsightScope() {
@@ -551,43 +563,51 @@
     } catch (error) { $('insightResultBody').textContent = error.message || '洞察失败，请稍后重试'; renderReasoning($('insightResult'),''); }
     finally { $('insightLayer').querySelectorAll('.insight-card,#insightCustomStart').forEach(button => { button.disabled = false; }); }
   }
-  function renderChatMessages() {
+  function renderChatMessages(follow = false) {
     const box = $('insightChatMessages'); box.replaceChildren();
     state.chatMessages.forEach(message => {
       const item = el('div','insight-chat-message ' + message.role);
-      const content = el('div'); renderAiText(content,message.content);
+      const content = el('div','chat-content'); renderAiText(content,message.content);
       item.append(el('strong','',message.role === 'user' ? '你' : 'AI'),content);
       if (message.role === 'assistant') renderReasoning(item,message.reasoning || '');
       box.append(item);
     });
-    box.scrollTop = box.scrollHeight;
+    if (follow) box.scrollTop = box.scrollHeight;
+  }
+  function updateStreamingChat(answer,thought) {
+    const box=$('insightChatMessages');
+    const follow=box.scrollHeight-box.scrollTop-box.clientHeight < 70;
+    const item=box.lastElementChild;
+    if (!item) return;
+    item.querySelector('.chat-content').textContent=answer || '正在思考…';
+    let details=item.querySelector('details');
+    if (thought && !details) { renderReasoning(item,thought); details=item.querySelector('details'); details.open=true; }
+    else if (details) details.querySelector('pre').textContent=thought || '正在等待 DeepSeek 思考…';
+    if (follow) box.scrollTop=box.scrollHeight;
   }
   async function sendChat(question) {
     if (!question.trim()) return;
     const history = state.chatMessages.slice(-12);
     const scopeTag = $('insightScope').value;
     const bounds = insightDateBounds();
-    state.chatMessages.push({role:'user',content:question.trim()},{role:'assistant',content:'正在阅读笔记并思考…'}); renderChatMessages();
+    state.chatMessages.push({role:'user',content:question.trim()},{role:'assistant',content:'正在阅读笔记并思考…'}); renderChatMessages(true);
     $('insightChatSend').disabled = true;
     $('insightMessage').textContent = '正在阅读笔记并回复…';
     try {
-      const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds}),credentials:'same-origin'});
+      const response = await fetch('/api/insights/chat',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:JSON.stringify({question:question.trim(),history,scopeTag,...bounds,label:bounds.label}),credentials:'same-origin'});
       let thought='',answer='';
       const data = await readSse(response,(event,chunk) => {
         if (event==='progress') $('insightMessage').textContent=chunk.text;
         if (event==='reasoning') thought+=chunk.text;
         if (event==='answer') answer+=chunk.text;
-        if (event==='reasoning' || event==='answer') {
-          state.chatMessages[state.chatMessages.length-1]={role:'assistant',content:answer || '正在思考…',reasoning:thought};
-          renderChatMessages();
-          const details=$('insightChatMessages').querySelector('.insight-chat-message:last-child details'); if (details) details.open=true;
-        }
+        if (event==='reasoning' || event==='answer') updateStreamingChat(answer,thought);
       });
-      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:data.answer,reasoning:thought || data.reasoning || ''}; renderChatMessages();
+      const box=$('insightChatMessages'); const follow=box.scrollHeight-box.scrollTop-box.clientHeight < 70;
+      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:data.answer,reasoning:thought || data.reasoning || ''}; renderChatMessages(follow);
       $('insightChatInput').value = '';
       $('insightMessage').textContent = '';
     } catch (error) {
-      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:error.message || '对话失败，请重试'}; renderChatMessages();
+      state.chatMessages[state.chatMessages.length-1] = {role:'assistant',content:error.message || '对话失败，请重试'}; renderChatMessages(false);
       $('insightMessage').textContent = error.message || '对话失败，请重试';
     } finally { $('insightChatSend').disabled = false; }
   }
@@ -800,11 +820,6 @@
   $('cancelEditor').addEventListener('click', closeEditor);
   $('modalBackdrop').addEventListener('click', closeEditor);
   $('noteForm').addEventListener('submit', saveNote);
-  $('tagInput').addEventListener('input', renderSuggestions);
-  $('tagInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(e.target.value); }
-    if (e.key === 'Backspace' && !e.target.value && state.draftTags.length) { state.draftTags.pop(); renderDraftTags(); }
-  });
   $('exportButton').addEventListener('click', exportNotes);
   $('importFlomoButton').addEventListener('click', () => {
     if (!state.account) { openAccount(); return; }
