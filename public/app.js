@@ -7,7 +7,7 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.13';
+  const APP_VERSION = '1.14';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
@@ -352,6 +352,37 @@
     $('notes').replaceChildren(...cards);
     $('empty').hidden=cards.length>0; $('emptyNew').textContent='回收站是空的'; $('emptyNew').disabled=true;
   }
+  function animateNoteBody(body, expanded) {
+    if (!body) return;
+    const previous = body._noteAnimation;
+    const currentHeight = body.getBoundingClientRect?.().height;
+    previous?.cancel();
+    body._noteAnimation = null;
+    if (!body.animate || !Number.isFinite(currentHeight) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      body.classList.toggle('preview', !expanded);
+      body.style.overflow = '';
+      return;
+    }
+    body.classList.remove('preview');
+    const fullHeight = body.scrollHeight;
+    const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
+    const targetHeight = expanded ? fullHeight : Math.min(fullHeight, Math.ceil(lineHeight * 7));
+    if (Math.abs(currentHeight - targetHeight) < 2) {
+      body.classList.toggle('preview', !expanded);
+      body.style.overflow = '';
+      return;
+    }
+    body.style.overflow = 'hidden';
+    const animation = body.animate([{height: currentHeight + 'px'}, {height: targetHeight + 'px'}], {duration: 220, easing: 'ease-in-out', fill: 'forwards'});
+    body._noteAnimation = animation;
+    animation.onfinish = () => {
+      if (body._noteAnimation !== animation) return;
+      body.classList.toggle('preview', !expanded);
+      animation.cancel();
+      body.style.overflow = '';
+      body._noteAnimation = null;
+    };
+  }
   function renderNotes() {
     if (state.view === 'trash') { renderTrash(); return; }
     $('filterLabel').hidden=false; $('collapseAll').hidden=false; $('emptyNew').disabled=false;
@@ -382,7 +413,7 @@
       let body;
       if (parts.text) { body=el('div','note-body'); renderTaggedText(body,parts.text); card.append(body); }
       const toggle=el('button','note-toggle',expanded ? '收起' : '展开'); toggle.type='button'; toggle.hidden=true; toggle.setAttribute('aria-expanded',String(expanded));
-      const setExpanded = next => { expanded=next; state.noteOpen.set(note.id,next); card.dataset.expanded=String(next); card.className='note ' + (next ? 'expanded' : 'preview'); if (body) body.classList.toggle('preview',!next); toggle.textContent=next ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(next)); };
+      const setExpanded = next => { expanded=next; state.noteOpen.set(note.id,next); card.dataset.expanded=String(next); card.className='note ' + (next ? 'expanded' : 'preview'); animateNoteBody(body,next); toggle.textContent=next ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(next)); };
       toggle.addEventListener('click',event => { event.stopPropagation(); setExpanded(card.dataset.expanded !== 'true'); });
       if (body) card.append(toggle);
       if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=imageSource(src); img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
