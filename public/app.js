@@ -7,6 +7,7 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
+  const APP_VERSION = '1.10';
   const $ = id => document.getElementById(id);
   const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer;
@@ -269,7 +270,13 @@
     $('empty').hidden = notes.length > 0;
     $('emptyNew').textContent = state.search || state.reviewIds !== null ? '查看全部笔记 ↗' : '写一条笔记 ↗';
   }
-  function render() { renderSidebar(); renderNotes(); }
+  async function renderSyncStatus() {
+    const account = state.account;
+    const pending = account ? await pendingChanges(account) : [];
+    if (account !== state.account) return;
+    $('syncStatus').textContent = pending.length ? `待同步 ${pending.length} 条` : !navigator.onLine ? '离线 · 可继续记录' : '';
+  }
+  function render() { renderSidebar(); renderNotes(); void renderSyncStatus(); }
   function chooseReview() {
     const ids = state.notes.map(n => n.id);
     const previous = state.reviewIds;
@@ -647,6 +654,51 @@
     $('accountError').textContent = '';
   }
   function openAccount() { $('accountInput').value = state.account || readAccount() || ''; $('passwordInput').value = ''; setAuthMode('login'); $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
+  async function wechatApi(method, payload) {
+    const response = await fetch('/api/wechat/setup', {method,headers:payload ? {'Content-Type':'application/json'} : {},body:payload ? JSON.stringify(payload) : undefined,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(8000)});
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || '微信接入暂时不可用');
+    return result;
+  }
+  async function refreshWechat() {
+    const data = await wechatApi('GET');
+    $('wechatSetup').hidden = !data.configured;
+    $('wechatCreate').hidden = !!data.configured;
+    if (data.configured) {
+      $('wechatCallback').value = data.callbackUrl;
+      $('wechatToken').value = data.token;
+      $('wechatLinked').textContent = data.linked ? '当前账号已有微信号绑定。' : '尚未绑定微信号。';
+    }
+  }
+  async function openWechat() {
+    if (!state.account) { openAccount(); return; }
+    closeSidebar();
+    $('wechatLayer').hidden = false;
+    $('wechatCode').hidden = true;
+    $('wechatMessage').textContent = '正在读取接入配置…';
+    try { await refreshWechat(); $('wechatMessage').textContent = ''; }
+    catch (error) { $('wechatMessage').textContent = error.message || '读取失败'; }
+  }
+  function closeWechat() { $('wechatLayer').hidden = true; }
+  $('wechatButton').addEventListener('click', openWechat);
+  $('wechatClose').addEventListener('click', closeWechat);
+  $('wechatBackdrop').addEventListener('click', closeWechat);
+  $('wechatCreate').addEventListener('click', async () => {
+    $('wechatCreate').disabled = true;
+    try { await wechatApi('POST',{action:'create'}); await refreshWechat(); $('wechatMessage').textContent = '配置已生成，请填写到公众号后台。'; }
+    catch (error) { $('wechatMessage').textContent = error.message || '生成失败'; }
+    finally { $('wechatCreate').disabled = false; }
+  });
+  $('wechatCodeButton').addEventListener('click', async () => {
+    $('wechatCodeButton').disabled = true;
+    try {
+      const result = await wechatApi('POST',{action:'code'});
+      $('wechatCode').textContent = `在公众号聊天中发送：绑定 ${result.code}（10 分钟内有效）`;
+      $('wechatCode').hidden = false;
+      $('wechatMessage').textContent = '';
+    } catch (error) { $('wechatMessage').textContent = error.message || '生成失败'; }
+    finally { $('wechatCodeButton').disabled = false; }
+  });
   $('authLoginTab').addEventListener('click', () => setAuthMode('login'));
   $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));
   $('switchAccount').addEventListener('click', async () => {
@@ -682,6 +734,7 @@
   document.addEventListener('pointerdown',e => { if ($('sidebar').classList.contains('open') && !$('sidebar').contains(e.target) && !$('mobileMenu').contains(e.target)) closeSidebar(); },true);
   function navigateBack() {
     if (!$('modalLayer').hidden) { closeEditor(); return true; }
+    if (!$('wechatLayer').hidden) { closeWechat(); return true; }
     if (!$('insightLayer').hidden) {
       if (!$('insightHome').hidden) closeInsight();
       else showInsightPanel('insightHome');
@@ -774,11 +827,18 @@
       render(); closeSidebar();
       toast(`已导入 ${result.imported} 条笔记，${result.alreadyPresent} 条已存在；共 ${result.tagCount} 个标签`);
     } catch (error) { toast(error.message || '导入失败'); }
-    finally { $('importFlomoButton').disabled = false; $('importFlomoButton').textContent = '导入 flomo'; }
+    finally { $('importFlomoButton').disabled = false; $('importFlomoButton').textContent = '导入'; }
   });
-  $('checkUpdate').addEventListener('click', () => {
-    if (/LinoteAndroid\/\d+/.test(navigator.userAgent)) window.location.href = 'linote://update';
-    else window.location.href = '/linote.apk';
+  $('checkUpdate').addEventListener('click', async () => {
+    if (/LinoteAndroid\/\d+/.test(navigator.userAgent)) { window.location.href = 'linote://update'; return; }
+    try {
+      const response = await fetch('/android-version.json',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+      if (!response.ok) throw new Error('无法检查更新');
+      const version = await response.json();
+      if (version.versionName === APP_VERSION) { toast('网页已是最新版'); return; }
+      await navigator.serviceWorker?.getRegistration()?.then(registration => registration?.update()).catch(() => {});
+      location.replace('/offline.html?version=' + encodeURIComponent(version.versionName));
+    } catch { toast('连接不可用，当前页面仍可离线使用'); }
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') navigateBack();

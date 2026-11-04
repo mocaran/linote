@@ -40,3 +40,23 @@ export const insights = sqliteTable("insights", {
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
 }, table => [primaryKey({columns:[table.userId,table.id]}),index("insights_user_created_idx").on(table.userId,table.createdAt)]);
+
+export const wechatChannels = sqliteTable("wechat_channels", {
+  userId: text("user_id").primaryKey(),
+  channelId: text("channel_id").notNull().unique(),
+  verifyToken: text("verify_token").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const wechatBindCodes = sqliteTable("wechat_bind_codes", {
+  channelId: text("channel_id").primaryKey(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+export const wechatLinks = sqliteTable("wechat_links", {
+  channelId: text("channel_id").notNull(),
+  openid: text("openid").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: text("created_at").notNull(),
+}, table => [primaryKey({columns:[table.channelId,table.openid]})]);

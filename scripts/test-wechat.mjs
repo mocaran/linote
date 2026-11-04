@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import ts from 'typescript';
+
+const source = fs.readFileSync(new URL('../lib/wechat.ts',import.meta.url),'utf8');
+const compiled = ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const module = {exports:{}};
+new Function('module','exports',compiled)(module,module.exports);
+const {validWechatSignature,xmlField,textReply} = module.exports;
+const token='sampletoken', timestamp='1700000000', nonce='12345';
+const signature=createHash('sha1').update([token,timestamp,nonce].sort().join('')).digest('hex');
+assert.equal(await validWechatSignature(token,timestamp,nonce,signature),true);
+assert.equal(await validWechatSignature(token,timestamp,nonce,'0'.repeat(40)),false);
+assert.equal(xmlField('<xml><Content><![CDATA[你好 #日记]]></Content></xml>','Content'),'你好 #日记');
+assert.equal(xmlField('<xml><Content>我 &amp; 你</Content></xml>','Content'),'我 & 你');
+const reply=await textReply('user','account','已保存').text();
+assert.match(reply,/<ToUserName><!\[CDATA\[user\]\]><\/ToUserName>/);
+assert.match(reply,/<Content><!\[CDATA\[已保存\]\]><\/Content>/);
+console.log('WeChat signature and XML checks passed');

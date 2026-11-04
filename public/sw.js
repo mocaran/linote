@@ -1,5 +1,5 @@
-const CACHE = 'linote-shell-v1.9';
-const CORE = ['/offline.html', '/app.js?v=1.9', '/styles.css?v=1.9', '/overrides.css?v=1.9', '/features.css?v=1.9', '/icon.png', '/manifest.webmanifest'];
+const CACHE = 'linote-shell-v1.10';
+const CORE = ['/offline.html', '/app.js?v=1.10', '/styles.css?v=1.10', '/overrides.css?v=1.10', '/features.css?v=1.10'];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
