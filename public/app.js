@@ -7,10 +7,11 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.15';
+  const APP_VERSION = '1.16';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
+  const imageDownloads = new Set();
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
@@ -140,6 +141,7 @@
       try { const trash=await trashApi('GET'); state.trash=trash.items; await cacheTrash(); } catch {}
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
+      void cacheRemoteImages([...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)],account);
       await syncInsightKey();
       if (oldNotes.length) toast('旧笔记已导入账号');
     } catch (error) { toast('暂时无法同步，已显示本机笔记'); }
@@ -170,13 +172,39 @@
   }
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
   function imageSource(ref) { return state.localImageUrls.get(ref) || ref; }
-  function localImageKey(ref) { return offlineKey('image') + ':' + ref.slice('/api/images/'.length); }
+  function localImageKey(ref, account = state.account) { return offlineKey('image',account) + ':' + ref.slice('/api/images/'.length); }
   async function hydrateLocalImages(notes) {
     const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/') && !state.localImageUrls.has(ref)))];
     for (const ref of refs) {
       try { const blob=await offlineRecord(localImageKey(ref)); if (blob instanceof Blob) state.localImageUrls.set(ref,URL.createObjectURL(blob)); }
       catch {}
     }
+  }
+  async function cacheRemoteImages(notes, account) {
+    const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/')))];
+    let saved = 0, failed = 0;
+    for (const ref of refs) {
+      if (state.account !== account || !navigator.onLine) break;
+      const key = localImageKey(ref,account);
+      if (state.localImageUrls.has(ref) || imageDownloads.has(key)) continue;
+      imageDownloads.add(key);
+      try {
+        let blob = await offlineRecord(key);
+        if (!(blob instanceof Blob)) {
+          const response = await fetch(ref,{credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(120000)});
+          if (!response.ok) throw new Error('图片下载失败');
+          blob = await response.blob();
+          if (!blob.type.startsWith('image/') || !blob.size || blob.size > 15000000) throw new Error('图片内容无效');
+          await offlineRecord(key,blob);
+          saved++;
+        }
+        if (state.account === account) state.localImageUrls.set(ref,URL.createObjectURL(blob));
+      } catch { failed++; }
+      finally { imageDownloads.delete(key); }
+    }
+    if (state.account !== account) return;
+    if (failed) toast(`${failed} 张图片未能存入本机，请联网后重新打开 linote`);
+    else if (saved) toast(`${saved} 张图片已存入本机，可离线查看`);
   }
   async function uploadNoteImages(note) {
     for (const ref of splitNoteBody(note.body).images) {
