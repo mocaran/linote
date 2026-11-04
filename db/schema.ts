@@ -41,6 +41,14 @@ export const insights = sqliteTable("insights", {
   createdAt: text("created_at").notNull(),
 }, table => [primaryKey({columns:[table.userId,table.id]}),index("insights_user_created_idx").on(table.userId,table.createdAt)]);
 
+export const trashItems = sqliteTable("trash_items", {
+  userId: text("user_id").notNull(),
+  id: text("id").notNull(),
+  kind: text("kind").notNull(),
+  payload: text("payload").notNull(),
+  deletedAt: text("deleted_at").notNull(),
+}, table => [primaryKey({columns:[table.userId,table.kind,table.id]}),index("trash_user_deleted_idx").on(table.userId,table.deletedAt)]);
+
 export const wechatChannels = sqliteTable("wechat_channels", {
   userId: text("user_id").primaryKey(),
   channelId: text("channel_id").notNull().unique(),

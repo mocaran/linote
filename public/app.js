@@ -7,10 +7,10 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.12';
+  const APP_VERSION = '1.13';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', noteOpen: new Map(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
-  let toastTimer;
+  const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
+  let toastTimer, draftTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
@@ -52,8 +52,15 @@
       request.onerror = () => reject(request.error);
     }); } finally { db.close(); }
   }
+  async function deleteOfflineRecord(key) {
+    const db=await offlineDatabase();
+    try { await new Promise((resolve,reject) => { const request=db.transaction('records','readwrite').objectStore('records').delete(key); request.onsuccess=resolve; request.onerror=()=>reject(request.error); }); }
+    finally { db.close(); }
+  }
   async function cachedNotes(account = state.account) { try { return await offlineRecord(offlineKey('notes',account)) || []; } catch { return []; } }
   async function cacheNotes() { await offlineRecord(offlineKey('notes'),state.notes); }
+  async function cachedTrash(account = state.account) { try { return await offlineRecord(offlineKey('trash',account)) || []; } catch { return []; } }
+  async function cacheTrash() { await offlineRecord(offlineKey('trash'),state.trash); }
   async function pendingChanges(account = state.account) { try { return await offlineRecord(offlineKey('pending',account)) || []; } catch { return []; } }
   async function queueChange(change) {
     const pending = (await pendingChanges()).filter(item => item.id !== change.id);
@@ -69,7 +76,16 @@
     const key = offlineKey('pending',account);
     const pending = await pendingChanges(account);
     for (const change of pending) {
-      try { await api(change.type === 'delete' ? 'DELETE' : 'POST',change.note,change.type === 'delete' ? change.id : undefined); }
+      try {
+        if (change.type === 'save') { await uploadNoteImages(change.note); await api('POST',change.note); }
+        else if (change.type === 'trash') { if (change.kind === 'note') await uploadNoteImages(change.item); await trashApi('POST',{kind:change.kind,id:change.id,item:change.item}); }
+        else if (change.type === 'restore') {
+          try { await trashApi('PUT',{kind:change.kind,id:change.id}); }
+          catch (error) { if (error.status === 404 && change.kind === 'note') { await uploadNoteImages(change.item); await api('POST',change.item); } else throw error; }
+        }
+        else if (change.type === 'purge') await trashApi('DELETE',undefined,change.kind,change.id);
+        else await api('DELETE',undefined,change.id);
+      }
       catch (error) { if (error.status === 401) toast('登录已过期，请重新登录后同步'); return false; }
       if (state.account !== account) return false;
       const latest = await pendingChanges(account);
@@ -93,12 +109,18 @@
     if (!response.ok) { const error = new Error((await response.json().catch(() => ({}))).error || '同步失败'); error.status = response.status; throw error; }
     return response.json();
   }
+  async function trashApi(method,payload,kind,id) {
+    const query=kind && id ? '?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id) : '';
+    const response=await fetch('/api/trash'+query,{method,headers:payload ? {'Content-Type':'application/json'} : {},body:payload ? JSON.stringify(payload) : undefined,cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(8000)});
+    if (!response.ok) { const error=new Error((await response.json().catch(()=>({}))).error || '回收站操作失败'); error.status=response.status; throw error; }
+    return response.json();
+  }
   async function loadFromAccount() {
     if (!state.account) return;
     const account = state.account;
     const cached = await cachedNotes(account);
     if (state.account !== account) return;
-    if (cached.length) { state.notes = cached; render(); }
+    if (cached.length) { state.notes = cached; state.trash=await cachedTrash(account); await hydrateLocalImages(cached); render(); }
     if (!navigator.onLine) { toast('离线模式 · 改动将在联网后同步'); return; }
     try {
       if (!await syncPending()) { toast('待同步笔记已保存在此设备'); return; }
@@ -115,6 +137,7 @@
       if (state.account !== account) return;
       state.notes = data.notes;
       await cacheNotes();
+      try { const trash=await trashApi('GET'); state.trash=trash.items; await cacheTrash(); } catch {}
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
       await syncInsightKey();
@@ -141,15 +164,38 @@
     if (at < 0 || !end.endsWith('-->')) return {text:value,images:[]};
     try {
       const images = JSON.parse(end.slice(at + marker.length,-3));
-      if (Array.isArray(images) && images.every(src => typeof src === 'string' && /^data:image\/(?:jpeg|png|webp|gif);base64,/.test(src))) return {text:value.slice(0,at).replace(/\n{1,2}$/,''),images};
+      if (Array.isArray(images) && images.every(src => typeof src === 'string' && (/^data:image\/(?:jpeg|png|webp|gif);base64,/.test(src) || /^\/api\/images\/[0-9a-f-]{36}$/i.test(src)))) return {text:value.slice(0,at).replace(/\n{1,2}$/,''),images};
     } catch {}
     return {text:value,images:[]};
   }
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
+  function imageSource(ref) { return state.localImageUrls.get(ref) || ref; }
+  function localImageKey(ref) { return offlineKey('image') + ':' + ref.slice('/api/images/'.length); }
+  async function hydrateLocalImages(notes) {
+    const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/') && !state.localImageUrls.has(ref)))];
+    for (const ref of refs) {
+      try { const blob=await offlineRecord(localImageKey(ref)); if (blob instanceof Blob) state.localImageUrls.set(ref,URL.createObjectURL(blob)); }
+      catch {}
+    }
+  }
+  async function uploadNoteImages(note) {
+    for (const ref of splitNoteBody(note.body).images) {
+      if (!ref.startsWith('/api/images/') || state.uploadedImages.has(ref)) continue;
+      const blob=await offlineRecord(localImageKey(ref));
+      if (!blob) continue;
+      if (!navigator.onLine) throw new TypeError('offline');
+      const response=await fetch(ref,{method:'PUT',headers:{'Content-Type':blob.type},body:blob,credentials:'same-origin',signal:AbortSignal.timeout(30000)});
+      if (!response.ok) { const error=new Error((await response.json().catch(()=>({}))).error || '图片同步失败'); error.status=response.status; throw error; }
+      state.uploadedImages.add(ref);
+    }
+  }
   function openImageViewer(src, alt) {
-    $('imageViewerImage').src = src;
+    $('imageViewerImage').src = imageSource(src);
     $('imageViewerImage').alt = alt;
+    $('imageViewer').classList.remove('zoomed');
+    $('imageViewerZoom').textContent = '放大';
     $('imageViewer').hidden = false;
+    $('imageViewer').querySelector('.image-lightbox-scroll')?.scrollTo?.(0,0);
     $('imageViewerClose').focus();
   }
   function closeImageViewer() {
@@ -158,6 +204,7 @@
   }
   $('imageViewerBackdrop').addEventListener('click',closeImageViewer);
   $('imageViewerClose').addEventListener('click',closeImageViewer);
+  $('imageViewerZoom').addEventListener('click',() => { const zoomed=$('imageViewer').classList.toggle('zoomed'); $('imageViewerZoom').textContent=zoomed ? '适合屏幕' : '放大'; });
   // A topic can also be a single punctuation mark, such as #? or #！.
   const TOPIC_PATTERN = /(^|[^#＃])([#＃])([^\s#＃，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’]{1,24}(?=$|[\s，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])|[，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])/gu;
   function inlineTopics(body) {
@@ -181,14 +228,18 @@
   }
   function renderEditorHighlight() {
     const input=$('noteBody'), mirror=$('noteHighlight');
+    const plain=input.value.length > 2400;
+    $('noteForm').classList.toggle('plain-long-note',plain);
+    if (plain) { mirror.replaceChildren(); return; }
     renderTaggedText(mirror,input.value+'\n');
     mirror.scrollTop=input.scrollTop;
   }
+  function syncEditorScroll() { if (!$('noteForm').classList.contains('plain-long-note')) $('noteHighlight').scrollTop=$('noteBody').scrollTop; }
   function renderEditorImages() {
     const box = $('editorImages'); box.replaceChildren();
     state.draftImages.forEach((src,index) => {
       const item = el('div','editor-image');
-      const img = el('img'); img.src = src; img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
+      const img = el('img'); img.src = imageSource(src); img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
       img.addEventListener('click',() => openImageViewer(src,img.alt));
       img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } });
       const remove = el('button','','×'); remove.type='button'; remove.setAttribute('aria-label','移除图片 ' + (index+1));
@@ -196,24 +247,19 @@
       item.append(img,remove); box.append(item);
     });
   }
-  async function compressImage(file) {
-    if (!file.type.startsWith('image/') || file.size > 15000000) throw new Error('请选择小于 15 MB 的图片');
-    const bitmap = await createImageBitmap(file);
-    const ratio = Math.min(1, 1200 / Math.max(bitmap.width,bitmap.height));
-    const canvas = document.createElement('canvas'); canvas.width=Math.max(1,Math.round(bitmap.width*ratio)); canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
-    const context = canvas.getContext('2d'); context.fillStyle='#fff'; context.fillRect(0,0,canvas.width,canvas.height); context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close();
-    for (const quality of [.82,.7,.55,.4]) {
-      const data = canvas.toDataURL('image/jpeg',quality);
-      if (data.length <= 200000) return data;
-    }
-    throw new Error('图片压缩后仍太大，请换一张');
+  async function keepOriginalImage(file) {
+    if (!/^image\/(?:jpeg|png|webp|gif)$/.test(file.type) || !file.size || file.size > 15000000) throw new Error('请选择不超过 15 MB 的 JPG、PNG、WebP 或 GIF 图片');
+    const ref='/api/images/' + crypto.randomUUID();
+    await offlineRecord(localImageKey(ref),file);
+    state.localImageUrls.set(ref,URL.createObjectURL(file));
+    return ref;
   }
   $('addImage').addEventListener('click',() => $('imageInput').click());
   $('imageInput').addEventListener('change',async event => {
     const files = [...event.target.files]; event.target.value = '';
     if (state.draftImages.length + files.length > 4) { toast('一条笔记最多添加 4 张图片'); return; }
     for (const file of files) {
-      try { state.draftImages.push(await compressImage(file)); renderEditorImages(); persistEditorDraft(); }
+      try { state.draftImages.push(await keepOriginalImage(file)); renderEditorImages(); persistEditorDraft(); }
       catch (error) { toast(error.message || '添加图片失败'); }
     }
   });
@@ -228,6 +274,7 @@
     return tags;
   }
   function setTag(tag) {
+    state.view = 'notes';
     state.tag = tag;
     state.reviewIds = null;
     $('searchInput').value = '';
@@ -242,7 +289,9 @@
   }
   function renderSidebar() {
     $('allCount').textContent = state.notes.length;
-    $('allNotes').classList.toggle('active', state.tag === null && state.reviewIds === null);
+    $('trashCount').textContent = state.trash.length || '';
+    $('trashButton').classList.toggle('active',state.view === 'trash');
+    $('allNotes').classList.toggle('active', state.view === 'notes' && state.tag === null && state.reviewIds === null);
     $('reviewNotes').classList.toggle('active', state.reviewIds !== null);
     $('sortButton').textContent = state.sort === 'desc' ? '笔记数 ↓' : '笔记数 ↑';
     const list = $('topicList'); list.replaceChildren();
@@ -281,7 +330,31 @@
     const q = state.search.trim().toLocaleLowerCase();
     return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || splitNoteBody(n.body).text.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(state.noteSort === 'created' ? b.createdAt : b.updatedAt || b.createdAt) - new Date(state.noteSort === 'created' ? a.createdAt : a.updatedAt || a.createdAt));
   }
+  function renderTrash() {
+    $('pageTitle').textContent='回收站';
+    $('resultCount').textContent=state.trash.length + ' 个项目';
+    $('filterLabel').hidden=true; $('collapseAll').hidden=true; $('reviewAgain').hidden=true; $('clearFilter').hidden=true; $('loadMore').hidden=true;
+    const cards=state.trash.map(entry => {
+      const card=el('article','note trash-card');
+      const top=el('div','note-top');
+      top.append(el('time','',formatDate(entry.deletedAt)),el('span','',entry.kind === 'note' ? '笔记' : '洞察'));
+      const actions=el('div','note-actions');
+      const restore=el('button','','恢复'); restore.type='button'; restore.addEventListener('click',() => restoreTrash(entry));
+      const purge=el('button','','彻底删除'); purge.type='button'; purge.addEventListener('click',() => purgeTrash(entry));
+      actions.append(restore,purge); top.append(actions); card.append(top);
+      if (entry.kind === 'note') {
+        const parts=splitNoteBody(entry.item.body);
+        if (parts.text) { const body=el('div','note-body preview'); renderTaggedText(body,parts.text); card.append(body); }
+        if (parts.images.length) { const img=el('img','trash-image'); img.src=imageSource(parts.images[0]); img.alt='已删除笔记的图片'; img.addEventListener('click',() => openImageViewer(parts.images[0],img.alt)); card.append(img); }
+      } else { card.append(el('strong','trash-title',entry.item.title),el('div','trash-excerpt',entry.item.content.slice(0,220))); }
+      return card;
+    });
+    $('notes').replaceChildren(...cards);
+    $('empty').hidden=cards.length>0; $('emptyNew').textContent='回收站是空的'; $('emptyNew').disabled=true;
+  }
   function renderNotes() {
+    if (state.view === 'trash') { renderTrash(); return; }
+    $('filterLabel').hidden=false; $('collapseAll').hidden=false; $('emptyNew').disabled=false;
     const notes = filteredNotes();
     const title = state.reviewIds !== null ? '回顾' : state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
@@ -293,10 +366,12 @@
     $('reviewAgain').hidden = state.reviewIds === null;
     $('clearFilter').hidden = !state.tag && !state.search && state.reviewIds === null;
     $('clearFilter').textContent = state.reviewIds !== null ? '退出回顾 ×' : '清除筛选 ×';
-    const list = $('notes'); list.replaceChildren();
-    notes.forEach(note => {
-      const expanded = state.noteOpen.has(note.id) ? state.noteOpen.get(note.id) : state.allExpanded;
+    const list = $('notes');
+    const cards = [], measured = [];
+    notes.slice(0,state.visibleCount).forEach(note => {
+      let expanded = state.noteOpen.has(note.id) ? state.noteOpen.get(note.id) : state.allExpanded;
       const card = el('article', 'note' + (expanded ? ' expanded' : ' preview'));
+      card.dataset.expanded=String(expanded);
       const top = el('div', 'note-top');
       top.append(el('time', '', formatDate(note.createdAt)));
       const actions = el('div', 'note-actions');
@@ -305,26 +380,30 @@
       actions.append(edit, remove); top.append(actions); card.append(top);
       const parts = splitNoteBody(note.body);
       let body;
-      if (parts.text) { body=el('div','note-body' + (expanded ? '' : ' preview')); renderTaggedText(body,parts.text); card.append(body); }
+      if (parts.text) { body=el('div','note-body'); renderTaggedText(body,parts.text); card.append(body); }
       const toggle=el('button','note-toggle',expanded ? '收起' : '展开'); toggle.type='button'; toggle.hidden=true; toggle.setAttribute('aria-expanded',String(expanded));
-      toggle.addEventListener('click',event => { event.stopPropagation(); state.noteOpen.set(note.id,!expanded); renderNotes(); });
+      const setExpanded = next => { expanded=next; state.noteOpen.set(note.id,next); card.dataset.expanded=String(next); card.className='note ' + (next ? 'expanded' : 'preview'); if (body) body.classList.toggle('preview',!next); toggle.textContent=next ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(next)); };
+      toggle.addEventListener('click',event => { event.stopPropagation(); setExpanded(card.dataset.expanded !== 'true'); });
       if (body) card.append(toggle);
-      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
+      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=imageSource(src); img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
         card.append(tags);
       }
-      card.addEventListener('click',event => { if (event.target.closest('button,img') || toggle.hidden) return; state.noteOpen.set(note.id,!expanded); renderNotes(); });
-      list.append(card);
-      if (body) {
-        const fullHeight = body.scrollHeight;
-        if (typeof fullHeight === 'number') {
-          const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
-          toggle.hidden = fullHeight <= lineHeight * 7 + 2;
-        }
-      }
+      card.addEventListener('click',event => { if (event.target.closest('button,img') || toggle.hidden) return; setExpanded(card.dataset.expanded !== 'true'); });
+      cards.push(card);
+      if (body) measured.push({body,toggle,expanded});
     });
+    list.replaceChildren(...cards);
+    measured.forEach(({body,toggle,expanded}) => {
+      if (typeof body.scrollHeight === 'number') {
+        const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
+        toggle.hidden = body.scrollHeight <= lineHeight * 7 + 2;
+      }
+      if (!expanded) body.classList.add('preview');
+    });
+    $('loadMore').hidden = notes.length <= state.visibleCount;
     $('empty').hidden = notes.length > 0;
     $('emptyNew').textContent = state.search || state.reviewIds !== null ? '查看全部笔记 ↗' : '写一条笔记 ↗';
   }
@@ -336,6 +415,7 @@
   }
   function render() { renderSidebar(); renderNotes(); void renderSyncStatus(); }
   function chooseReview() {
+    state.view='notes';
     const ids = state.notes.map(n => n.id);
     const previous = state.reviewIds;
     for (let i=ids.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
@@ -371,6 +451,7 @@
     state.editing = note?.id || null;
     const parts = note ? splitNoteBody(note.body) : {text:'',images:[]};
     state.draftImages = draft?.images ? [...draft.images] : [...parts.images];
+    void hydrateLocalImages([{body:joinNoteBody('',state.draftImages)}]).then(renderEditorImages);
     $('editorTitle').textContent = note ? '编辑笔记' : '写一条笔记';
     const legacyTags = note ? note.tags.filter(tag => !inlineTopics(parts.text).includes(tag)) : [];
     $('noteBody').value = draft?.body ?? (parts.text + (legacyTags.length ? '\n' + legacyTags.map(tag => '#' + tag).join(' ') : '') + (!note && state.tag ? '\n#' + state.tag : ''));
@@ -378,30 +459,70 @@
     $('modalLayer').hidden = false;
     $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
-    setTimeout(() => $('noteBody').focus(), 0);
+    if (!note) setTimeout(() => $('noteBody').focus(), 0);
   }
   function closeEditor() {
+    clearTimeout(draftTimer);
     if (state.editing) clearEditorDraft(state.editing);
     else persistEditorDraft();
     $('modalLayer').hidden = true;
     document.body.style.overflow = '';
     state.editing = null;
   }
+  function showTrash() { state.view='trash'; state.tag=null; state.reviewIds=null; state.search=''; $('searchInput').value=''; closeSidebar(); render(); }
   async function deleteNote(id) {
-    if (!confirm('确定删除这条笔记吗？')) return;
+    if (!confirm('将这条笔记移入回收站？')) return;
+    const note=state.notes.find(item => item.id === id);
+    if (!note) return;
+    const deletedAt=new Date().toISOString();
     let queued = false;
-    try { await api('DELETE', undefined, id); }
+    let entry={id,kind:'note',item:note,deletedAt};
+    try { await uploadNoteImages(note); const result=await trashApi('POST',{kind:'note',id,item:note}); entry=result.entry; }
     catch (error) {
       if (!canQueueOffline(error)) { toast(error.message || '删除失败'); return; }
-      try { await queueChange({type:'delete',id,updatedAt:new Date().toISOString()}); queued = true; }
+      try { await queueChange({type:'trash',kind:'note',id,item:note,updatedAt:deletedAt}); queued = true; }
       catch { toast('本机存储不可用，删除失败'); return; }
     }
     if (!queued) await clearPending(id).catch(() => {});
     state.notes = state.notes.filter(n => n.id !== id);
-    try { await cacheNotes(); } catch { toast('本机缓存更新失败'); }
+    state.trash=[entry,...state.trash.filter(item => !(item.kind === 'note' && item.id === id))];
+    try { await Promise.all([cacheNotes(),cacheTrash()]); } catch { toast('本机缓存更新失败'); }
     if (state.reviewIds) state.reviewIds = state.reviewIds.filter(noteId => noteId !== id);
     if (state.tag && !tagCounts().has(state.tag)) state.tag = null;
-    render(); toast(queued ? '已在本机删除，联网后同步' : '笔记已删除');
+    render(); toast(queued ? '已移入本机回收站，联网后同步' : '已移入回收站');
+  }
+  async function restoreTrash(entry) {
+    let queued=false;
+    try { await trashApi('PUT',{kind:entry.kind,id:entry.id}); }
+    catch(error) {
+      if (!canQueueOffline(error)) { toast(error.message || '恢复失败'); return; }
+      try { await queueChange({type:'restore',kind:entry.kind,id:entry.id,item:entry.item,updatedAt:new Date().toISOString()}); queued=true; }
+      catch { toast('本机存储不可用，恢复失败'); return; }
+    }
+    if (!queued) await clearPending(entry.id).catch(()=>{});
+    state.trash=state.trash.filter(item => !(item.kind === entry.kind && item.id === entry.id));
+    if (entry.kind === 'note') { state.notes=[entry.item,...state.notes.filter(note=>note.id!==entry.id)]; await cacheNotes().catch(()=>{}); }
+    await cacheTrash().catch(()=>{}); render(); toast(queued ? '已在本机恢复，联网后同步' : '已恢复');
+  }
+  async function purgeTrash(entry) {
+    if (!confirm('彻底删除后无法恢复，确定继续吗？')) return;
+    let queued=false;
+    try { await trashApi('DELETE',undefined,entry.kind,entry.id); }
+    catch(error) {
+      if (!canQueueOffline(error)) { toast(error.message || '彻底删除失败'); return; }
+      try { await queueChange({type:'purge',kind:entry.kind,id:entry.id,updatedAt:new Date().toISOString()}); queued=true; }
+      catch { toast('本机存储不可用，删除失败'); return; }
+    }
+    if (!queued) await clearPending(entry.id).catch(()=>{});
+    state.trash=state.trash.filter(item => !(item.kind===entry.kind && item.id===entry.id));
+    if (entry.kind==='note') { state.notes=state.notes.filter(note=>note.id!==entry.id); await cacheNotes().catch(()=>{}); }
+    if (entry.kind==='note') for (const ref of splitNoteBody(entry.item.body).images.filter(value=>value.startsWith('/api/images/'))) {
+      if ([...state.notes,...state.trash.filter(item=>item.kind==='note').map(item=>item.item)].some(note=>note.body.includes(ref))) continue;
+      await deleteOfflineRecord(localImageKey(ref)).catch(()=>{});
+      const url=state.localImageUrls.get(ref); if (url) URL.revokeObjectURL(url);
+      state.localImageUrls.delete(ref);
+    }
+    await cacheTrash().catch(()=>{}); render(); toast(queued ? '已在本机彻底删除，联网后同步' : '已彻底删除');
   }
   async function saveNote(event) {
     event.preventDefault();
@@ -416,7 +537,7 @@
     } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags:inlineTopics(body), createdAt: now, updatedAt: now };
     $('saveNote').disabled = true;
     let queued = false;
-    try { await api('POST', note); }
+    try { await uploadNoteImages(note); await api('POST', note); }
     catch (error) {
       if (!canQueueOffline(error)) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
       try { await queueChange({type:'save',id:note.id,note,updatedAt:now}); queued = true; }
@@ -430,8 +551,8 @@
     const draftId = state.editing || null;
     closeEditor(); clearEditorDraft(draftId); render(); toast(queued ? '已保存在本机，联网后同步' : '笔记已保存');
   }
-  $('noteBody').addEventListener('input', () => { renderEditorHighlight(); persistEditorDraft(); });
-  $('noteBody').addEventListener('scroll',renderEditorHighlight);
+  $('noteBody').addEventListener('input', () => { renderEditorHighlight(); clearTimeout(draftTimer); draftTimer=setTimeout(persistEditorDraft,400); });
+  $('noteBody').addEventListener('scroll',syncEditorScroll,{passive:true});
   function exportNotes() {
     if (!state.account) { openAccount(); return; }
     const link = document.createElement('a');
@@ -439,12 +560,14 @@
   }
   ['newNoteSidebar','newNoteTop','mobileFab','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
   $('allNotes').addEventListener('click', () => setTag(null));
+  $('trashButton').addEventListener('click',showTrash);
   $('reviewNotes').addEventListener('click', chooseReview);
   $('reviewAgain').addEventListener('click', chooseReview);
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
   $('filterLabel').addEventListener('click',() => { state.noteSort=state.noteSort === 'updated' ? 'created' : 'updated'; renderNotes(); });
-  $('collapseAll').addEventListener('click',() => { state.allExpanded=!state.allExpanded; state.noteOpen.clear(); renderNotes(); });
-  $('searchInput').addEventListener('input', e => { state.reviewIds = null; state.search = e.target.value; render(); });
+  $('collapseAll').addEventListener('click',() => { state.allExpanded=!state.allExpanded; state.noteOpen.clear(); $('collapseAll').textContent=state.allExpanded ? '全部收起' : '全部展开'; $('collapseAll').setAttribute('aria-label',state.allExpanded ? '收起全部笔记至七行' : '展开全部笔记'); $('notes').children && [...$('notes').children].forEach(card => { const body=card.querySelector('.note-body'); const toggle=card.querySelector('.note-toggle'); card.dataset.expanded=String(state.allExpanded); card.className='note ' + (state.allExpanded ? 'expanded' : 'preview'); if (body) body.classList.toggle('preview',!state.allExpanded); if (toggle) { toggle.textContent=state.allExpanded ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(state.allExpanded)); } }); });
+  $('loadMore').addEventListener('click',() => { const top=window.scrollY; state.visibleCount+=30; renderNotes(); window.scrollTo(0,top); });
+  $('searchInput').addEventListener('input', e => { state.view='notes'; state.reviewIds = null; state.search = e.target.value; render(); });
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
   document.addEventListener('click', e => { if (!$('calendarPanel').hidden && !$('calendarPanel').contains(e.target) && !$('calendarToggle').contains(e.target)) { $('calendarPanel').hidden = true; $('calendarToggle').setAttribute('aria-expanded','false'); } });
@@ -657,9 +780,18 @@
       const list = $('insightHistoryList'); list.replaceChildren();
       if (!data.insights.length) { list.textContent = '还没有洞察记录'; return; }
       data.insights.forEach(insight => {
+        const row=el('div','insight-history-row');
         const button = el('button','insight-history-item'); button.type = 'button';
         button.append(el('strong','',insight.title),el('span','',insight.scope + ' · ' + insight.noteCount + ' 条 · ' + formatDate(insight.createdAt)));
-        button.addEventListener('click',() => showInsightResult(insight)); list.append(button);
+        button.addEventListener('click',() => showInsightResult(insight));
+        const remove=el('button','insight-history-delete','删除'); remove.type='button'; remove.setAttribute('aria-label','删除洞察：'+insight.title);
+        remove.addEventListener('click',async () => {
+          if (!confirm('将这条洞察移入回收站？')) return;
+          remove.disabled=true;
+          try { const result=await trashApi('POST',{kind:'insight',id:insight.id}); state.trash=[result.entry,...state.trash]; await cacheTrash().catch(()=>{}); row.remove(); renderSidebar(); toast('已移入回收站'); }
+          catch(error) { remove.disabled=false; toast(error.message || '删除失败'); }
+        });
+        row.append(button,remove); list.append(row);
       });
     } catch(error) { $('insightHistoryList').textContent = error.message || '读取失败'; }
   }
@@ -749,7 +881,7 @@
     try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {}
     try { localStorage.removeItem(ACCOUNT_KEY); } catch {}
     try { await offlineRecord('last-account',''); } catch {}
-    state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
+    state.account = null; state.notes = []; state.trash=[]; state.view='notes'; state.localImageUrls.forEach(url=>URL.revokeObjectURL(url)); state.localImageUrls.clear(); state.uploadedImages.clear(); state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
   });
   $('accountForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -763,7 +895,7 @@
       if (!response.ok) throw new Error(result.error || '服务暂时不可用，请稍后再试');
     } catch (error) { $('authSubmit').disabled = false; $('accountError').textContent = error.message || '登录失败'; return; }
     $('authSubmit').disabled = false;
-    state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
+    state.account = account; state.notes = []; state.trash=[]; state.view='notes'; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
     $('accountName').textContent = account;
     $('accountLayer').hidden = true;
     await rememberAccount(account);
@@ -900,7 +1032,7 @@
   }
   async function startApp() {
     const remembered = await rememberedAccount();
-    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); render(); }
+    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); await hydrateLocalImages([...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]); render(); }
     if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});

@@ -62,14 +62,18 @@ body.linote-android .web-only{display:none!important}
 .mobile-fab{display:none}
 @media(max-width:620px){.top-new{display:none}.search:focus-within{right:16px}.mobile-fab{position:fixed;z-index:9;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%);display:grid;place-items:center;width:62px;height:62px;padding:0;border:0;border-radius:18px;background:#c94b4b;color:#fff;box-shadow:0 8px 24px #7c292933;font-size:38px;line-height:1}.mobile-fab:active{transform:translateX(-50%) scale(.95)}.content{padding-bottom:calc(115px + env(safe-area-inset-bottom))}.empty button{display:none}}
 .sidebar-tools #wechatButton{grid-column:1/-1}
+.sidebar-tools #trashButton{grid-column:1/-1;border-top:1px solid #eee;margin-top:3px}.sidebar-tools #trashButton.active{background:#faeaea;color:#b63e3e}
 .feed-heading #filterLabel{padding:5px 3px;color:#9a7777;font-size:11px;white-space:nowrap}.feed-heading #filterLabel:disabled{color:#aaa;cursor:default}.feed-actions #collapseAll{white-space:nowrap}
-.note{cursor:pointer}.note-body.preview{max-height:12.6em;overflow:hidden}.note-toggle{display:block;border:0;background:none;color:#4d83d1!important;font-size:12px!important;padding:0 0 8px;text-align:left}.note-toggle[hidden]{display:none}.note.preview .note-body:has(+ .note-toggle:not([hidden])){margin-bottom:5px}
-.note-images img,.editor-image img{cursor:zoom-in}.image-lightbox[hidden]{display:none}.image-lightbox{position:fixed;inset:0;z-index:45;display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}.image-lightbox-backdrop{position:absolute;inset:0;background:#111e}.image-lightbox>img{position:relative;max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 10px 55px #0007}.image-lightbox>button{position:absolute;right:calc(15px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));z-index:1;width:44px;height:44px;border:0;border-radius:50%;background:#fff2;color:#fff;font-size:29px;line-height:1}
+.note{cursor:pointer}.note-body.preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:7;line-clamp:7;overflow:hidden}.note-toggle{display:block;border:0;background:none;color:#4d83d1!important;font-size:12px!important;padding:0 0 8px;text-align:left}.note-toggle[hidden]{display:none}.note.preview .note-body:has(+ .note-toggle:not([hidden])){margin-bottom:5px}
+.load-more{display:block;margin:18px auto 0;padding:10px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#a14b4b}
+.insight-history-row{display:flex;align-items:center;gap:8px}.insight-history-row .insight-history-item{flex:1;min-width:0}.insight-history-delete{flex:none;border:0;background:none;color:#a14b4b;padding:9px}.trash-card{cursor:default}.trash-card .note-body.preview{display:-webkit-box;-webkit-line-clamp:4;line-clamp:4;max-height:none;overflow:hidden}.trash-card .note-top{gap:10px}.trash-card .note-actions{margin-left:auto}.trash-title{display:block;margin-top:15px}.trash-excerpt{margin-top:8px;color:#666;font-size:13px;line-height:1.7}.trash-image{display:block;max-width:180px;max-height:180px;object-fit:contain;cursor:zoom-in}
+.note-images img,.editor-image img{cursor:zoom-in}.image-lightbox[hidden]{display:none}.image-lightbox{position:fixed;inset:0;z-index:45;padding:0;background:#111e}.image-lightbox-backdrop{position:absolute;inset:0}.image-lightbox-scroll{position:relative;width:100%;height:100%;overflow:auto;overscroll-behavior:contain;padding:calc(65px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));text-align:center}.image-lightbox-scroll img{display:block;width:auto;max-width:100%;height:auto;max-height:none;margin:0 auto;box-shadow:0 10px 55px #0007}.image-lightbox.zoomed .image-lightbox-scroll img{max-width:none}.image-lightbox-controls{position:absolute;right:calc(14px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px}.image-lightbox-controls button{min-height:42px;border:0;border-radius:8px;background:#333;color:#fff;padding:0 13px;font-size:14px}.image-lightbox-controls #imageViewerClose{width:42px;font-size:26px;line-height:1}
 .inline-topic{color:#b94d56;font-weight:600}
+.plain-long-note .editor-writing #noteBody{color:#333}.plain-long-note .editor-writing .note-highlight{display:none}
 .modal-layer{padding:0}.editor{width:100%;height:100dvh;max-height:100dvh;border-radius:0;display:flex;flex-direction:column}.editor #noteForm{display:flex;flex-direction:column;flex:1;min-height:0}.editor-writing{position:relative;flex:1;min-height:0}.editor-writing #noteBody,.editor-writing .note-highlight{position:absolute;inset:0;width:100%;height:100%;max-height:none;min-height:0;margin:0;padding:28px max(28px,calc((100vw - 980px)/2));font:inherit;font-size:17px;line-height:1.9;letter-spacing:normal;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4}.editor-writing #noteBody{z-index:1;resize:none;background:transparent;color:transparent;caret-color:#333;overflow:auto}.editor-writing #noteBody::placeholder{color:#b6b6b6}.editor-writing #noteBody::selection{background:#d9bbbb99}.editor-writing .note-highlight{z-index:0;pointer-events:none;overflow:hidden;color:#333}.editor-images{padding-left:max(28px,calc((100vw - 980px)/2));padding-right:max(28px,calc((100vw - 980px)/2))}
 .insight-dialog.chat-expanded{width:100vw;max-width:none;height:100dvh;max-height:100dvh;border-radius:0}.insight-dialog.chat-expanded .insight-content{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px max(22px,calc((100vw - 1100px)/2))}.insight-dialog.chat-expanded #insightChat{max-width:none;width:100%;flex:1;min-height:0;display:flex;flex-direction:column}.insight-dialog.chat-expanded .insight-chat-messages{flex:1;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:12px 5px 24px}.insight-dialog.chat-expanded .insight-chat-message{max-width:min(85%,850px)}.insight-dialog.chat-expanded .insight-chat-form{flex:none;margin-top:8px}.insight-dialog.chat-expanded .insight-chat-form textarea{min-height:65px;max-height:150px}.insight-dialog.chat-expanded .insight-message{min-height:0;margin-top:3px}
 @media(max-width:620px){.editor-writing #noteBody,.editor-writing .note-highlight{padding:22px 19px;font-size:16px}.editor-header{padding:18px 20px}.editor-images{padding:0 19px 12px}.insight-dialog.chat-expanded .insight-content{padding:14px 15px}.insight-dialog.chat-expanded .insight-chat-message{max-width:96%}.insight-dialog.chat-expanded .insight-chat-form{flex-direction:row}.insight-dialog.chat-expanded .insight-chat-form textarea{min-height:55px}.insight-layer:has(.chat-expanded){padding:0}.feed-heading{gap:4px}.feed-heading>div{gap:5px}.feed-actions{gap:2px}.feed-actions #collapseAll{font-size:11px}}
-</style><div class="app-shell"><div class="mobile-shade" id="mobileShade" hidden=""></div><aside class="sidebar" id="sidebar"><div class="brand"><div><strong>linote</strong><small>保卫个人史</small></div></div><button class="new-button" id="newNoteSidebar" type="button"><span aria-hidden="true">＋</span> 写一条笔记 <kbd>N</kbd></button><button class="calendar-toggle" id="calendarToggle" type="button" aria-expanded="false"><span>▦</span> 每日记录 <small id="todayCount">今日 0 条</small></button><div class="mini-stats" id="calendarPanel" hidden=""><div class="mini-stats-title"><span>近 35 天</span><strong id="totalStats">共 0 条笔记</strong></div><div class="mini-calendar" id="miniCalendar" aria-label="最近 35 天笔记数量"></div><div class="calendar-day-detail" id="calendarDayDetail">点选日期查看笔记数量</div></div><div class="side-section"><button class="nav-item active" id="allNotes" type="button"><span class="nav-icon">▦</span><span>全部笔记</span><span class="nav-count" id="allCount">0</span></button><button class="nav-item" id="reviewNotes" type="button"><span class="nav-icon">↻</span><span>回顾</span><span class="nav-count">10</span></button><button class="nav-item" id="insightButton" type="button"><span class="nav-icon">✧</span><span>洞察</span></button></div><div class="side-section topic-section"><div class="section-heading"><span>话题</span><button type="button" id="sortButton" title="切换话题排序" aria-label="切换话题排序">笔记数 ↓</button></div><div class="topic-list" id="topicList"></div><p class="topic-hint" id="topicHint">添加话题后，会自动出现在这里。</p></div><div class="sidebar-bottom"><span class="account-name" id="accountName">未登录</span><div class="sidebar-tools"><button type="button" id="switchAccount">切换账号</button><button type="button" id="checkUpdate">检查更新</button><button type="button" id="exportButton">导出</button><button type="button" id="importFlomoButton">导入</button><button type="button" class="web-only" id="wechatButton">微信接入</button></div><input id="importFlomoFile" type="file" accept=".html,text/html" aria-label="选择 flomo 导出文件" hidden=""/></div></aside><main class="main"><header class="topbar"><button class="mobile-menu" type="button" id="mobileMenu" aria-label="打开菜单">☰</button><div class="crumb"><strong id="pageTitle">全部笔记</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus" aria-live="polite"></span><label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索笔记或话题" aria-label="搜索笔记或话题"/><kbd>Ctrl K</kbd></label><button class="top-new" id="newNoteTop" type="button">＋ <span>新笔记</span></button></div></header><div class="content"><div class="feed-heading"><div><strong id="resultCount">0 条笔记</strong><button type="button" id="filterLabel" aria-label="切换笔记排序">按最近编辑排序 ▾</button></div><div class="feed-actions"><button type="button" id="reviewAgain" hidden="">换一组 ↻</button><button type="button" id="clearFilter" hidden="">清除筛选 ×</button><button type="button" id="collapseAll" aria-label="展开全部笔记">全部展开</button></div></div><section class="notes" id="notes" aria-live="polite"></section><section class="empty" id="empty"><button type="button" id="emptyNew">写一条笔记 <span>↗</span></button></section></div><button class="mobile-fab" id="mobileFab" type="button" aria-label="写一条笔记">＋</button></main></div><div class="modal-layer" id="modalLayer" hidden=""><div class="modal-backdrop" id="modalBackdrop"></div><section class="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle"><div class="editor-header"><h2 id="editorTitle">写一条笔记</h2><button type="button" id="closeEditor" aria-label="关闭编辑器">×</button></div><form id="noteForm"><div class="editor-writing"><div id="noteHighlight" class="note-highlight" aria-hidden="true"></div><textarea id="noteBody" placeholder="现在的想法是… 在正文中输入 #话题" maxLength="20000" spellCheck="false" data-gramm="false"></textarea></div><div class="editor-images" id="editorImages"></div><div class="editor-footer"><button type="button" class="add-image" id="addImage">＋ 图片</button><input id="imageInput" type="file" accept="image/*" multiple="" hidden=""/><span id="editorHint">保存后同步到当前账号</span><div><button type="button" class="cancel" id="cancelEditor">取消</button><button type="submit" class="save" id="saveNote">保存笔记 <span>↗</span></button></div></div></form></section></div><div class="image-lightbox" id="imageViewer" role="dialog" aria-modal="true" aria-label="查看笔记图片" hidden=""><div class="image-lightbox-backdrop" id="imageViewerBackdrop"></div><button type="button" id="imageViewerClose" aria-label="关闭图片">×</button><img id="imageViewerImage" alt="笔记图片"/></div><div class="account-layer" id="accountLayer" hidden=""><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle"><h2 id="accountTitle">登录 linote</h2><p>用账号和密码同步你的笔记，账号名可以是中文。</p><div class="auth-tabs"><button type="button" id="authLoginTab" class="active">登录</button><button type="button" id="authRegisterTab">创建账号</button></div><form id="accountForm"><label for="accountInput">账号</label><input id="accountInput" type="text" autoComplete="username" placeholder="输入账号名" maxLength="64" required=""/><label for="passwordInput">密码</label><input id="passwordInput" type="password" autoComplete="current-password" placeholder="输入密码（可留空）"/><small id="accountError"></small><button type="submit" id="authSubmit">登录</button></form><p class="account-warning">旧编号可作为账号名，首次使用请选择“创建账号”设置密码。请记住密码，目前无法找回。</p></section></div><div class="wechat-layer" id="wechatLayer" hidden=""><div class="wechat-backdrop" id="wechatBackdrop"></div><section class="wechat-dialog" role="dialog" aria-modal="true" aria-labelledby="wechatTitle"><header><h2 id="wechatTitle">微信接入</h2><button type="button" id="wechatClose" aria-label="关闭微信接入">×</button></header><p>注册可配置服务器回调的公众号后，把以下信息填入微信公众平台。公众号的文字消息需要先绑定，再写入当前 linote 账号。</p><div id="wechatSetup" hidden=""><label for="wechatCallback">服务器地址 URL</label><input id="wechatCallback" readOnly=""/><label for="wechatToken">令牌 Token</label><input id="wechatToken" readOnly=""/><p class="wechat-tip">消息加解密方式选“明文模式”，然后启用服务器配置。首次发送笔记前，请生成绑定口令。</p><button type="button" id="wechatCodeButton">生成绑定口令</button><div id="wechatCode" class="wechat-code" hidden=""></div><p id="wechatLinked" class="wechat-tip"></p></div><button type="button" id="wechatCreate">生成接入配置</button><div id="wechatMessage" role="status"></div></section></div><div class="insight-layer" id="insightLayer" hidden=""><div class="insight-backdrop" id="insightBackdrop"></div><section class="insight-dialog" id="insightDialog" role="dialog" aria-modal="true" aria-labelledby="insightTitle"><header class="insight-header"><h2 id="insightTitle">AI 洞察</h2><div><button type="button" id="insightHistoryButton">历史洞察</button><button type="button" id="insightSettingsButton">设置密钥</button><button type="button" id="insightClose" aria-label="关闭 AI 洞察">×</button></div></header><div class="insight-content"><section id="insightHome"><h3>选择一个视角，重新理解笔记</h3><div class="insight-scope"><span id="insightCount">0 条笔记</span><span id="insightRangeSummary">不限日期 · 全部话题</span><button type="button" id="insightRangeButton">修改范围</button></div><div class="insight-grid"><button class="insight-card" type="button" data-mode="themes"><span aria-hidden="true">▤</span><strong>主题延伸</strong><small>发现反复出现的主题与新问题</small></button><button class="insight-card" type="button" data-mode="friend"><span aria-hidden="true">◉</span><strong>朋友视角</strong><small>从旁观者角度重新看待自己</small></button><button class="insight-card" type="button" data-mode="tension"><span aria-hidden="true">≋</span><strong>主要矛盾</strong><small>找出笔记中相互拉扯的想法</small></button><button class="insight-card" type="button" data-mode="default"><span aria-hidden="true">✧</span><strong>默认洞察</strong><small>发现潜藏的思维模式与变化</small></button><button class="insight-card" type="button" data-mode="values"><span aria-hidden="true">⚖</span><strong>价值澄清</strong><small>看见选择背后真正重视的事</small></button><button class="insight-card" type="button" data-mode="reverse"><span aria-hidden="true">⇄</span><strong>逆向思考</strong><small>从反面检验熟悉的判断</small></button><button class="insight-card" type="button" data-mode="second"><span aria-hidden="true">↝</span><strong>二阶思考</strong><small>看看决定之后的连锁影响</small></button><button class="insight-card" type="button" data-mode="mbti"><span aria-hidden="true">◌</span><strong>MBTI 视角</strong><small>以性格偏好作为反思线索</small></button></div><div class="insight-custom"><label for="insightCustomPrompt">自由对话</label><textarea id="insightCustomPrompt" maxLength="1000" rows="4" placeholder="想聊聊这些笔记里的什么？例如：我最近反复在想什么？"></textarea><button type="button" id="insightCustomStart">开始对话</button></div><p class="insight-privacy">洞察时会将所选范围内的笔记发送给 DeepSeek。笔记较多时会分批分析；密钥加密保存在账号中。</p></section><section id="insightChat" hidden=""><button type="button" class="insight-back" id="insightChatBack">← 返回洞察</button><h3>自由对话</h3><p id="insightChatScope" class="insight-chat-scope"></p><div id="insightChatMessages" class="insight-chat-messages" aria-live="polite"></div><form id="insightChatForm" class="insight-chat-form"><textarea id="insightChatInput" maxLength="1000" rows="3" placeholder="继续提问…" aria-label="继续提问"></textarea><button type="submit" id="insightChatSend">发送</button></form></section><section id="insightRangePanel" hidden=""><button type="button" class="insight-back" id="insightRangeBack">← 返回洞察</button><h3>修改范围</h3><div class="range-field"><label for="insightDatePreset">日期范围</label><select id="insightDatePreset"><option value="last7">最近 7 天</option><option value="week">本周</option><option value="month">本月</option><option value="all" selected="">不限日期</option><option value="custom">自定义日期</option></select></div><div class="range-custom" id="insightCustomDates" hidden=""><label for="insightStartDate">开始日期</label><input id="insightStartDate" type="date"/><label for="insightEndDate">结束日期</label><input id="insightEndDate" type="date"/></div><div class="range-field"><label for="insightScope">话题范围</label><select id="insightScope" aria-label="话题范围"><option value="">全部话题</option></select></div><button type="button" class="range-apply" id="insightRangeApply">应用范围</button></section><section id="insightKeyPanel" hidden=""><h3>DeepSeek API 密钥</h3><p>密钥与你的 linote 账号关联，网页和 APK 登录同一账号后共用。</p><input id="insightKeyInput" type="password" autoComplete="off" placeholder="粘贴 DeepSeek API 密钥"/><div class="insight-key-actions"><button type="button" id="insightKeySave">保存到账号</button><button type="button" id="insightKeyClear">清除密钥</button><button type="button" class="plain" id="insightKeyBack">返回</button></div></section><section id="insightResult" hidden=""><button type="button" class="insight-back" id="insightResultBack">← 选择视角</button><h3 id="insightResultTitle"></h3><div id="insightResultMeta"></div><article id="insightResultBody"></article></section><section id="insightHistory" hidden=""><button type="button" class="insight-back" id="insightHistoryBack">← 返回洞察</button><h3>历史洞察</h3><div id="insightHistoryList"></div></section><div class="insight-message" id="insightMessage" role="status" aria-live="polite"></div></div></section></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script>(function(){setTimeout(function(){if(window.linoteReady)return;var box=document.createElement('div');box.style.cssText='position:fixed;z-index:100;left:12px;right:12px;bottom:12px;background:#fff;border:1px solid #c94b4b;border-radius:9px;padding:14px;color:#333;box-shadow:0 8px 25px #0002;font:14px sans-serif';box.textContent='linote 页面未正常启动。';var button=document.createElement('button');button.type='button';button.textContent='重试页面';button.style.cssText='margin-left:12px;border:0;border-radius:5px;background:#c94b4b;color:white;padding:7px 12px';button.onclick=function(){location.reload()};box.appendChild(button);document.body.appendChild(box)},4000)})()</script><script>(() => {
+</style><div class="app-shell"><div class="mobile-shade" id="mobileShade" hidden=""></div><aside class="sidebar" id="sidebar"><div class="brand"><div><strong>linote</strong><small>保卫个人史</small></div></div><button class="new-button" id="newNoteSidebar" type="button"><span aria-hidden="true">＋</span> 写一条笔记 <kbd>N</kbd></button><button class="calendar-toggle" id="calendarToggle" type="button" aria-expanded="false"><span>▦</span> 每日记录 <small id="todayCount">今日 0 条</small></button><div class="mini-stats" id="calendarPanel" hidden=""><div class="mini-stats-title"><span>近 35 天</span><strong id="totalStats">共 0 条笔记</strong></div><div class="mini-calendar" id="miniCalendar" aria-label="最近 35 天笔记数量"></div><div class="calendar-day-detail" id="calendarDayDetail">点选日期查看笔记数量</div></div><div class="side-section"><button class="nav-item active" id="allNotes" type="button"><span class="nav-icon">▦</span><span>全部笔记</span><span class="nav-count" id="allCount">0</span></button><button class="nav-item" id="reviewNotes" type="button"><span class="nav-icon">↻</span><span>回顾</span><span class="nav-count">10</span></button><button class="nav-item" id="insightButton" type="button"><span class="nav-icon">✧</span><span>洞察</span></button></div><div class="side-section topic-section"><div class="section-heading"><span>话题</span><button type="button" id="sortButton" title="切换话题排序" aria-label="切换话题排序">笔记数 ↓</button></div><div class="topic-list" id="topicList"></div><p class="topic-hint" id="topicHint">添加话题后，会自动出现在这里。</p></div><div class="sidebar-bottom"><span class="account-name" id="accountName">未登录</span><div class="sidebar-tools"><button type="button" id="switchAccount">切换账号</button><button type="button" id="checkUpdate">检查更新</button><button type="button" id="exportButton">导出</button><button type="button" id="importFlomoButton">导入</button><button type="button" class="web-only" id="wechatButton">微信接入</button><button type="button" id="trashButton">回收站 <span id="trashCount"></span></button></div><input id="importFlomoFile" type="file" accept=".html,text/html" aria-label="选择 flomo 导出文件" hidden=""/></div></aside><main class="main"><header class="topbar"><button class="mobile-menu" type="button" id="mobileMenu" aria-label="打开菜单">☰</button><div class="crumb"><strong id="pageTitle">全部笔记</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus" aria-live="polite"></span><label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索笔记或话题" aria-label="搜索笔记或话题"/><kbd>Ctrl K</kbd></label><button class="top-new" id="newNoteTop" type="button">＋ <span>新笔记</span></button></div></header><div class="content"><div class="feed-heading"><div><strong id="resultCount">0 条笔记</strong><button type="button" id="filterLabel" aria-label="切换笔记排序">按最近编辑排序 ▾</button></div><div class="feed-actions"><button type="button" id="reviewAgain" hidden="">换一组 ↻</button><button type="button" id="clearFilter" hidden="">清除筛选 ×</button><button type="button" id="collapseAll" aria-label="展开全部笔记">全部展开</button></div></div><section class="notes" id="notes" aria-live="polite"></section><button type="button" class="load-more" id="loadMore" hidden="">加载更多笔记</button><section class="empty" id="empty"><button type="button" id="emptyNew">写一条笔记 <span>↗</span></button></section></div><button class="mobile-fab" id="mobileFab" type="button" aria-label="写一条笔记">＋</button></main></div><div class="modal-layer" id="modalLayer" hidden=""><div class="modal-backdrop" id="modalBackdrop"></div><section class="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle"><div class="editor-header"><h2 id="editorTitle">写一条笔记</h2><button type="button" id="closeEditor" aria-label="关闭编辑器">×</button></div><form id="noteForm"><div class="editor-writing"><div id="noteHighlight" class="note-highlight" aria-hidden="true"></div><textarea id="noteBody" placeholder="现在的想法是… 在正文中输入 #话题" maxLength="20000" spellCheck="false" data-gramm="false"></textarea></div><div class="editor-images" id="editorImages"></div><div class="editor-footer"><button type="button" class="add-image" id="addImage">＋ 图片</button><input id="imageInput" type="file" accept="image/*" multiple="" hidden=""/><span id="editorHint">保存后同步到当前账号</span><div><button type="button" class="cancel" id="cancelEditor">取消</button><button type="submit" class="save" id="saveNote">保存笔记 <span>↗</span></button></div></div></form></section></div><div class="image-lightbox" id="imageViewer" role="dialog" aria-modal="true" aria-label="查看笔记图片" hidden=""><div class="image-lightbox-backdrop" id="imageViewerBackdrop"></div><div class="image-lightbox-scroll"><img id="imageViewerImage" alt="笔记图片"/></div><div class="image-lightbox-controls"><button type="button" id="imageViewerZoom">放大</button><button type="button" id="imageViewerClose" aria-label="关闭图片">×</button></div></div><div class="account-layer" id="accountLayer" hidden=""><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle"><h2 id="accountTitle">登录 linote</h2><p>用账号和密码同步你的笔记，账号名可以是中文。</p><div class="auth-tabs"><button type="button" id="authLoginTab" class="active">登录</button><button type="button" id="authRegisterTab">创建账号</button></div><form id="accountForm"><label for="accountInput">账号</label><input id="accountInput" type="text" autoComplete="username" placeholder="输入账号名" maxLength="64" required=""/><label for="passwordInput">密码</label><input id="passwordInput" type="password" autoComplete="current-password" placeholder="输入密码（可留空）"/><small id="accountError"></small><button type="submit" id="authSubmit">登录</button></form><p class="account-warning">旧编号可作为账号名，首次使用请选择“创建账号”设置密码。请记住密码，目前无法找回。</p></section></div><div class="wechat-layer" id="wechatLayer" hidden=""><div class="wechat-backdrop" id="wechatBackdrop"></div><section class="wechat-dialog" role="dialog" aria-modal="true" aria-labelledby="wechatTitle"><header><h2 id="wechatTitle">微信接入</h2><button type="button" id="wechatClose" aria-label="关闭微信接入">×</button></header><p>注册可配置服务器回调的公众号后，把以下信息填入微信公众平台。公众号的文字消息需要先绑定，再写入当前 linote 账号。</p><div id="wechatSetup" hidden=""><label for="wechatCallback">服务器地址 URL</label><input id="wechatCallback" readOnly=""/><label for="wechatToken">令牌 Token</label><input id="wechatToken" readOnly=""/><p class="wechat-tip">消息加解密方式选“明文模式”，然后启用服务器配置。首次发送笔记前，请生成绑定口令。</p><button type="button" id="wechatCodeButton">生成绑定口令</button><div id="wechatCode" class="wechat-code" hidden=""></div><p id="wechatLinked" class="wechat-tip"></p></div><button type="button" id="wechatCreate">生成接入配置</button><div id="wechatMessage" role="status"></div></section></div><div class="insight-layer" id="insightLayer" hidden=""><div class="insight-backdrop" id="insightBackdrop"></div><section class="insight-dialog" id="insightDialog" role="dialog" aria-modal="true" aria-labelledby="insightTitle"><header class="insight-header"><h2 id="insightTitle">AI 洞察</h2><div><button type="button" id="insightHistoryButton">历史洞察</button><button type="button" id="insightSettingsButton">设置密钥</button><button type="button" id="insightClose" aria-label="关闭 AI 洞察">×</button></div></header><div class="insight-content"><section id="insightHome"><h3>选择一个视角，重新理解笔记</h3><div class="insight-scope"><span id="insightCount">0 条笔记</span><span id="insightRangeSummary">不限日期 · 全部话题</span><button type="button" id="insightRangeButton">修改范围</button></div><div class="insight-grid"><button class="insight-card" type="button" data-mode="themes"><span aria-hidden="true">▤</span><strong>主题延伸</strong><small>发现反复出现的主题与新问题</small></button><button class="insight-card" type="button" data-mode="friend"><span aria-hidden="true">◉</span><strong>朋友视角</strong><small>从旁观者角度重新看待自己</small></button><button class="insight-card" type="button" data-mode="tension"><span aria-hidden="true">≋</span><strong>主要矛盾</strong><small>找出笔记中相互拉扯的想法</small></button><button class="insight-card" type="button" data-mode="default"><span aria-hidden="true">✧</span><strong>默认洞察</strong><small>发现潜藏的思维模式与变化</small></button><button class="insight-card" type="button" data-mode="values"><span aria-hidden="true">⚖</span><strong>价值澄清</strong><small>看见选择背后真正重视的事</small></button><button class="insight-card" type="button" data-mode="reverse"><span aria-hidden="true">⇄</span><strong>逆向思考</strong><small>从反面检验熟悉的判断</small></button><button class="insight-card" type="button" data-mode="second"><span aria-hidden="true">↝</span><strong>二阶思考</strong><small>看看决定之后的连锁影响</small></button><button class="insight-card" type="button" data-mode="mbti"><span aria-hidden="true">◌</span><strong>MBTI 视角</strong><small>以性格偏好作为反思线索</small></button></div><div class="insight-custom"><label for="insightCustomPrompt">自由对话</label><textarea id="insightCustomPrompt" maxLength="1000" rows="4" placeholder="想聊聊这些笔记里的什么？例如：我最近反复在想什么？"></textarea><button type="button" id="insightCustomStart">开始对话</button></div><p class="insight-privacy">洞察时会将所选范围内的笔记发送给 DeepSeek。笔记较多时会分批分析；密钥加密保存在账号中。</p></section><section id="insightChat" hidden=""><button type="button" class="insight-back" id="insightChatBack">← 返回洞察</button><h3>自由对话</h3><p id="insightChatScope" class="insight-chat-scope"></p><div id="insightChatMessages" class="insight-chat-messages" aria-live="polite"></div><form id="insightChatForm" class="insight-chat-form"><textarea id="insightChatInput" maxLength="1000" rows="3" placeholder="继续提问…" aria-label="继续提问"></textarea><button type="submit" id="insightChatSend">发送</button></form></section><section id="insightRangePanel" hidden=""><button type="button" class="insight-back" id="insightRangeBack">← 返回洞察</button><h3>修改范围</h3><div class="range-field"><label for="insightDatePreset">日期范围</label><select id="insightDatePreset"><option value="last7">最近 7 天</option><option value="week">本周</option><option value="month">本月</option><option value="all" selected="">不限日期</option><option value="custom">自定义日期</option></select></div><div class="range-custom" id="insightCustomDates" hidden=""><label for="insightStartDate">开始日期</label><input id="insightStartDate" type="date"/><label for="insightEndDate">结束日期</label><input id="insightEndDate" type="date"/></div><div class="range-field"><label for="insightScope">话题范围</label><select id="insightScope" aria-label="话题范围"><option value="">全部话题</option></select></div><button type="button" class="range-apply" id="insightRangeApply">应用范围</button></section><section id="insightKeyPanel" hidden=""><h3>DeepSeek API 密钥</h3><p>密钥与你的 linote 账号关联，网页和 APK 登录同一账号后共用。</p><input id="insightKeyInput" type="password" autoComplete="off" placeholder="粘贴 DeepSeek API 密钥"/><div class="insight-key-actions"><button type="button" id="insightKeySave">保存到账号</button><button type="button" id="insightKeyClear">清除密钥</button><button type="button" class="plain" id="insightKeyBack">返回</button></div></section><section id="insightResult" hidden=""><button type="button" class="insight-back" id="insightResultBack">← 选择视角</button><h3 id="insightResultTitle"></h3><div id="insightResultMeta"></div><article id="insightResultBody"></article></section><section id="insightHistory" hidden=""><button type="button" class="insight-back" id="insightHistoryBack">← 返回洞察</button><h3>历史洞察</h3><div id="insightHistoryList"></div></section><div class="insight-message" id="insightMessage" role="status" aria-live="polite"></div></div></section></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script>(function(){setTimeout(function(){if(window.linoteReady)return;var box=document.createElement('div');box.style.cssText='position:fixed;z-index:100;left:12px;right:12px;bottom:12px;background:#fff;border:1px solid #c94b4b;border-radius:9px;padding:14px;color:#333;box-shadow:0 8px 25px #0002;font:14px sans-serif';box.textContent='linote 页面未正常启动。';var button=document.createElement('button');button.type='button';button.textContent='重试页面';button.style.cssText='margin-left:12px;border:0;border-radius:5px;background:#c94b4b;color:white;padding:7px 12px';button.onclick=function(){location.reload()};box.appendChild(button);document.body.appendChild(box)},4000)})()</script><script>(() => {
   'use strict';
   document.body.classList.toggle('linote-android', /LinoteAndroid\/\d+/.test(navigator.userAgent));
   const KEY = 'linote.notes.v1';
@@ -78,10 +82,10 @@ body.linote-android .web-only{display:none!important}
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.12';
+  const APP_VERSION = '1.13';
   const $ = id => document.getElementById(id);
-  const state = { notes: [], account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', noteOpen: new Map(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
-  let toastTimer;
+  const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
+  let toastTimer, draftTimer;
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
@@ -123,8 +127,15 @@ body.linote-android .web-only{display:none!important}
       request.onerror = () => reject(request.error);
     }); } finally { db.close(); }
   }
+  async function deleteOfflineRecord(key) {
+    const db=await offlineDatabase();
+    try { await new Promise((resolve,reject) => { const request=db.transaction('records','readwrite').objectStore('records').delete(key); request.onsuccess=resolve; request.onerror=()=>reject(request.error); }); }
+    finally { db.close(); }
+  }
   async function cachedNotes(account = state.account) { try { return await offlineRecord(offlineKey('notes',account)) || []; } catch { return []; } }
   async function cacheNotes() { await offlineRecord(offlineKey('notes'),state.notes); }
+  async function cachedTrash(account = state.account) { try { return await offlineRecord(offlineKey('trash',account)) || []; } catch { return []; } }
+  async function cacheTrash() { await offlineRecord(offlineKey('trash'),state.trash); }
   async function pendingChanges(account = state.account) { try { return await offlineRecord(offlineKey('pending',account)) || []; } catch { return []; } }
   async function queueChange(change) {
     const pending = (await pendingChanges()).filter(item => item.id !== change.id);
@@ -140,7 +151,16 @@ body.linote-android .web-only{display:none!important}
     const key = offlineKey('pending',account);
     const pending = await pendingChanges(account);
     for (const change of pending) {
-      try { await api(change.type === 'delete' ? 'DELETE' : 'POST',change.note,change.type === 'delete' ? change.id : undefined); }
+      try {
+        if (change.type === 'save') { await uploadNoteImages(change.note); await api('POST',change.note); }
+        else if (change.type === 'trash') { if (change.kind === 'note') await uploadNoteImages(change.item); await trashApi('POST',{kind:change.kind,id:change.id,item:change.item}); }
+        else if (change.type === 'restore') {
+          try { await trashApi('PUT',{kind:change.kind,id:change.id}); }
+          catch (error) { if (error.status === 404 && change.kind === 'note') { await uploadNoteImages(change.item); await api('POST',change.item); } else throw error; }
+        }
+        else if (change.type === 'purge') await trashApi('DELETE',undefined,change.kind,change.id);
+        else await api('DELETE',undefined,change.id);
+      }
       catch (error) { if (error.status === 401) toast('登录已过期，请重新登录后同步'); return false; }
       if (state.account !== account) return false;
       const latest = await pendingChanges(account);
@@ -164,12 +184,18 @@ body.linote-android .web-only{display:none!important}
     if (!response.ok) { const error = new Error((await response.json().catch(() => ({}))).error || '同步失败'); error.status = response.status; throw error; }
     return response.json();
   }
+  async function trashApi(method,payload,kind,id) {
+    const query=kind && id ? '?kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id) : '';
+    const response=await fetch('/api/trash'+query,{method,headers:payload ? {'Content-Type':'application/json'} : {},body:payload ? JSON.stringify(payload) : undefined,cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(8000)});
+    if (!response.ok) { const error=new Error((await response.json().catch(()=>({}))).error || '回收站操作失败'); error.status=response.status; throw error; }
+    return response.json();
+  }
   async function loadFromAccount() {
     if (!state.account) return;
     const account = state.account;
     const cached = await cachedNotes(account);
     if (state.account !== account) return;
-    if (cached.length) { state.notes = cached; render(); }
+    if (cached.length) { state.notes = cached; state.trash=await cachedTrash(account); await hydrateLocalImages(cached); render(); }
     if (!navigator.onLine) { toast('离线模式 · 改动将在联网后同步'); return; }
     try {
       if (!await syncPending()) { toast('待同步笔记已保存在此设备'); return; }
@@ -186,6 +212,7 @@ body.linote-android .web-only{display:none!important}
       if (state.account !== account) return;
       state.notes = data.notes;
       await cacheNotes();
+      try { const trash=await trashApi('GET'); state.trash=trash.items; await cacheTrash(); } catch {}
       if (oldNotes.length) localStorage.removeItem(KEY);
       render();
       await syncInsightKey();
@@ -212,15 +239,38 @@ body.linote-android .web-only{display:none!important}
     if (at < 0 || !end.endsWith('-->')) return {text:value,images:[]};
     try {
       const images = JSON.parse(end.slice(at + marker.length,-3));
-      if (Array.isArray(images) && images.every(src => typeof src === 'string' && /^data:image\/(?:jpeg|png|webp|gif);base64,/.test(src))) return {text:value.slice(0,at).replace(/\n{1,2}$/,''),images};
+      if (Array.isArray(images) && images.every(src => typeof src === 'string' && (/^data:image\/(?:jpeg|png|webp|gif);base64,/.test(src) || /^\/api\/images\/[0-9a-f-]{36}$/i.test(src)))) return {text:value.slice(0,at).replace(/\n{1,2}$/,''),images};
     } catch {}
     return {text:value,images:[]};
   }
   function joinNoteBody(text, images) { return text + (images.length ? IMAGE_MARKER + JSON.stringify(images) + '-->' : ''); }
+  function imageSource(ref) { return state.localImageUrls.get(ref) || ref; }
+  function localImageKey(ref) { return offlineKey('image') + ':' + ref.slice('/api/images/'.length); }
+  async function hydrateLocalImages(notes) {
+    const refs = [...new Set(notes.flatMap(note => splitNoteBody(note.body).images).filter(ref => ref.startsWith('/api/images/') && !state.localImageUrls.has(ref)))];
+    for (const ref of refs) {
+      try { const blob=await offlineRecord(localImageKey(ref)); if (blob instanceof Blob) state.localImageUrls.set(ref,URL.createObjectURL(blob)); }
+      catch {}
+    }
+  }
+  async function uploadNoteImages(note) {
+    for (const ref of splitNoteBody(note.body).images) {
+      if (!ref.startsWith('/api/images/') || state.uploadedImages.has(ref)) continue;
+      const blob=await offlineRecord(localImageKey(ref));
+      if (!blob) continue;
+      if (!navigator.onLine) throw new TypeError('offline');
+      const response=await fetch(ref,{method:'PUT',headers:{'Content-Type':blob.type},body:blob,credentials:'same-origin',signal:AbortSignal.timeout(30000)});
+      if (!response.ok) { const error=new Error((await response.json().catch(()=>({}))).error || '图片同步失败'); error.status=response.status; throw error; }
+      state.uploadedImages.add(ref);
+    }
+  }
   function openImageViewer(src, alt) {
-    $('imageViewerImage').src = src;
+    $('imageViewerImage').src = imageSource(src);
     $('imageViewerImage').alt = alt;
+    $('imageViewer').classList.remove('zoomed');
+    $('imageViewerZoom').textContent = '放大';
     $('imageViewer').hidden = false;
+    $('imageViewer').querySelector('.image-lightbox-scroll')?.scrollTo?.(0,0);
     $('imageViewerClose').focus();
   }
   function closeImageViewer() {
@@ -229,6 +279,7 @@ body.linote-android .web-only{display:none!important}
   }
   $('imageViewerBackdrop').addEventListener('click',closeImageViewer);
   $('imageViewerClose').addEventListener('click',closeImageViewer);
+  $('imageViewerZoom').addEventListener('click',() => { const zoomed=$('imageViewer').classList.toggle('zoomed'); $('imageViewerZoom').textContent=zoomed ? '适合屏幕' : '放大'; });
   // A topic can also be a single punctuation mark, such as #? or #！.
   const TOPIC_PATTERN = /(^|[^#＃])([#＃])([^\s#＃，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’]{1,24}(?=$|[\s，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])|[，。！？；：、,.!?;:()（）\[\]{}<>《》"“”'‘’])/gu;
   function inlineTopics(body) {
@@ -252,14 +303,18 @@ body.linote-android .web-only{display:none!important}
   }
   function renderEditorHighlight() {
     const input=$('noteBody'), mirror=$('noteHighlight');
+    const plain=input.value.length > 2400;
+    $('noteForm').classList.toggle('plain-long-note',plain);
+    if (plain) { mirror.replaceChildren(); return; }
     renderTaggedText(mirror,input.value+'\n');
     mirror.scrollTop=input.scrollTop;
   }
+  function syncEditorScroll() { if (!$('noteForm').classList.contains('plain-long-note')) $('noteHighlight').scrollTop=$('noteBody').scrollTop; }
   function renderEditorImages() {
     const box = $('editorImages'); box.replaceChildren();
     state.draftImages.forEach((src,index) => {
       const item = el('div','editor-image');
-      const img = el('img'); img.src = src; img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
+      const img = el('img'); img.src = imageSource(src); img.alt = '笔记图片 ' + (index+1); img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1));
       img.addEventListener('click',() => openImageViewer(src,img.alt));
       img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } });
       const remove = el('button','','×'); remove.type='button'; remove.setAttribute('aria-label','移除图片 ' + (index+1));
@@ -267,24 +322,19 @@ body.linote-android .web-only{display:none!important}
       item.append(img,remove); box.append(item);
     });
   }
-  async function compressImage(file) {
-    if (!file.type.startsWith('image/') || file.size > 15000000) throw new Error('请选择小于 15 MB 的图片');
-    const bitmap = await createImageBitmap(file);
-    const ratio = Math.min(1, 1200 / Math.max(bitmap.width,bitmap.height));
-    const canvas = document.createElement('canvas'); canvas.width=Math.max(1,Math.round(bitmap.width*ratio)); canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
-    const context = canvas.getContext('2d'); context.fillStyle='#fff'; context.fillRect(0,0,canvas.width,canvas.height); context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close();
-    for (const quality of [.82,.7,.55,.4]) {
-      const data = canvas.toDataURL('image/jpeg',quality);
-      if (data.length <= 200000) return data;
-    }
-    throw new Error('图片压缩后仍太大，请换一张');
+  async function keepOriginalImage(file) {
+    if (!/^image\/(?:jpeg|png|webp|gif)$/.test(file.type) || !file.size || file.size > 15000000) throw new Error('请选择不超过 15 MB 的 JPG、PNG、WebP 或 GIF 图片');
+    const ref='/api/images/' + crypto.randomUUID();
+    await offlineRecord(localImageKey(ref),file);
+    state.localImageUrls.set(ref,URL.createObjectURL(file));
+    return ref;
   }
   $('addImage').addEventListener('click',() => $('imageInput').click());
   $('imageInput').addEventListener('change',async event => {
     const files = [...event.target.files]; event.target.value = '';
     if (state.draftImages.length + files.length > 4) { toast('一条笔记最多添加 4 张图片'); return; }
     for (const file of files) {
-      try { state.draftImages.push(await compressImage(file)); renderEditorImages(); persistEditorDraft(); }
+      try { state.draftImages.push(await keepOriginalImage(file)); renderEditorImages(); persistEditorDraft(); }
       catch (error) { toast(error.message || '添加图片失败'); }
     }
   });
@@ -299,6 +349,7 @@ body.linote-android .web-only{display:none!important}
     return tags;
   }
   function setTag(tag) {
+    state.view = 'notes';
     state.tag = tag;
     state.reviewIds = null;
     $('searchInput').value = '';
@@ -313,7 +364,9 @@ body.linote-android .web-only{display:none!important}
   }
   function renderSidebar() {
     $('allCount').textContent = state.notes.length;
-    $('allNotes').classList.toggle('active', state.tag === null && state.reviewIds === null);
+    $('trashCount').textContent = state.trash.length || '';
+    $('trashButton').classList.toggle('active',state.view === 'trash');
+    $('allNotes').classList.toggle('active', state.view === 'notes' && state.tag === null && state.reviewIds === null);
     $('reviewNotes').classList.toggle('active', state.reviewIds !== null);
     $('sortButton').textContent = state.sort === 'desc' ? '笔记数 ↓' : '笔记数 ↑';
     const list = $('topicList'); list.replaceChildren();
@@ -352,7 +405,31 @@ body.linote-android .web-only{display:none!important}
     const q = state.search.trim().toLocaleLowerCase();
     return state.notes.filter(n => (!state.tag || n.tags.includes(state.tag)) && (!q || splitNoteBody(n.body).text.toLocaleLowerCase().includes(q) || n.tags.some(t => t.toLocaleLowerCase().includes(q)))).sort((a,b) => new Date(state.noteSort === 'created' ? b.createdAt : b.updatedAt || b.createdAt) - new Date(state.noteSort === 'created' ? a.createdAt : a.updatedAt || a.createdAt));
   }
+  function renderTrash() {
+    $('pageTitle').textContent='回收站';
+    $('resultCount').textContent=state.trash.length + ' 个项目';
+    $('filterLabel').hidden=true; $('collapseAll').hidden=true; $('reviewAgain').hidden=true; $('clearFilter').hidden=true; $('loadMore').hidden=true;
+    const cards=state.trash.map(entry => {
+      const card=el('article','note trash-card');
+      const top=el('div','note-top');
+      top.append(el('time','',formatDate(entry.deletedAt)),el('span','',entry.kind === 'note' ? '笔记' : '洞察'));
+      const actions=el('div','note-actions');
+      const restore=el('button','','恢复'); restore.type='button'; restore.addEventListener('click',() => restoreTrash(entry));
+      const purge=el('button','','彻底删除'); purge.type='button'; purge.addEventListener('click',() => purgeTrash(entry));
+      actions.append(restore,purge); top.append(actions); card.append(top);
+      if (entry.kind === 'note') {
+        const parts=splitNoteBody(entry.item.body);
+        if (parts.text) { const body=el('div','note-body preview'); renderTaggedText(body,parts.text); card.append(body); }
+        if (parts.images.length) { const img=el('img','trash-image'); img.src=imageSource(parts.images[0]); img.alt='已删除笔记的图片'; img.addEventListener('click',() => openImageViewer(parts.images[0],img.alt)); card.append(img); }
+      } else { card.append(el('strong','trash-title',entry.item.title),el('div','trash-excerpt',entry.item.content.slice(0,220))); }
+      return card;
+    });
+    $('notes').replaceChildren(...cards);
+    $('empty').hidden=cards.length>0; $('emptyNew').textContent='回收站是空的'; $('emptyNew').disabled=true;
+  }
   function renderNotes() {
+    if (state.view === 'trash') { renderTrash(); return; }
+    $('filterLabel').hidden=false; $('collapseAll').hidden=false; $('emptyNew').disabled=false;
     const notes = filteredNotes();
     const title = state.reviewIds !== null ? '回顾' : state.tag ? '#' + state.tag : '全部笔记';
     $('pageTitle').textContent = title;
@@ -364,10 +441,12 @@ body.linote-android .web-only{display:none!important}
     $('reviewAgain').hidden = state.reviewIds === null;
     $('clearFilter').hidden = !state.tag && !state.search && state.reviewIds === null;
     $('clearFilter').textContent = state.reviewIds !== null ? '退出回顾 ×' : '清除筛选 ×';
-    const list = $('notes'); list.replaceChildren();
-    notes.forEach(note => {
-      const expanded = state.noteOpen.has(note.id) ? state.noteOpen.get(note.id) : state.allExpanded;
+    const list = $('notes');
+    const cards = [], measured = [];
+    notes.slice(0,state.visibleCount).forEach(note => {
+      let expanded = state.noteOpen.has(note.id) ? state.noteOpen.get(note.id) : state.allExpanded;
       const card = el('article', 'note' + (expanded ? ' expanded' : ' preview'));
+      card.dataset.expanded=String(expanded);
       const top = el('div', 'note-top');
       top.append(el('time', '', formatDate(note.createdAt)));
       const actions = el('div', 'note-actions');
@@ -376,26 +455,30 @@ body.linote-android .web-only{display:none!important}
       actions.append(edit, remove); top.append(actions); card.append(top);
       const parts = splitNoteBody(note.body);
       let body;
-      if (parts.text) { body=el('div','note-body' + (expanded ? '' : ' preview')); renderTaggedText(body,parts.text); card.append(body); }
+      if (parts.text) { body=el('div','note-body'); renderTaggedText(body,parts.text); card.append(body); }
       const toggle=el('button','note-toggle',expanded ? '收起' : '展开'); toggle.type='button'; toggle.hidden=true; toggle.setAttribute('aria-expanded',String(expanded));
-      toggle.addEventListener('click',event => { event.stopPropagation(); state.noteOpen.set(note.id,!expanded); renderNotes(); });
+      const setExpanded = next => { expanded=next; state.noteOpen.set(note.id,next); card.dataset.expanded=String(next); card.className='note ' + (next ? 'expanded' : 'preview'); if (body) body.classList.toggle('preview',!next); toggle.textContent=next ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(next)); };
+      toggle.addEventListener('click',event => { event.stopPropagation(); setExpanded(card.dataset.expanded !== 'true'); });
       if (body) card.append(toggle);
-      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=src; img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
+      if (parts.images.length) { const images=el('div','note-images'); parts.images.forEach((src,index) => { const img=el('img'); img.src=imageSource(src); img.alt='笔记图片 ' + (index+1); img.loading='lazy'; img.tabIndex=0; img.setAttribute('role','button'); img.setAttribute('aria-label','查看笔记图片 ' + (index+1)); img.addEventListener('click',event => { event.stopPropagation(); openImageViewer(src,img.alt); }); img.addEventListener('keydown',event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openImageViewer(src,img.alt); } }); images.append(img); }); card.append(images); }
       if (note.tags.length) {
         const tags = el('div', 'note-tags');
         note.tags.forEach(tag => { const chip = el('button', '', '#' + tag); chip.type = 'button'; chip.addEventListener('click', () => setTag(tag)); tags.append(chip); });
         card.append(tags);
       }
-      card.addEventListener('click',event => { if (event.target.closest('button,img') || toggle.hidden) return; state.noteOpen.set(note.id,!expanded); renderNotes(); });
-      list.append(card);
-      if (body) {
-        const fullHeight = body.scrollHeight;
-        if (typeof fullHeight === 'number') {
-          const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
-          toggle.hidden = fullHeight <= lineHeight * 7 + 2;
-        }
-      }
+      card.addEventListener('click',event => { if (event.target.closest('button,img') || toggle.hidden) return; setExpanded(card.dataset.expanded !== 'true'); });
+      cards.push(card);
+      if (body) measured.push({body,toggle,expanded});
     });
+    list.replaceChildren(...cards);
+    measured.forEach(({body,toggle,expanded}) => {
+      if (typeof body.scrollHeight === 'number') {
+        const lineHeight = parseFloat(getComputedStyle(body).lineHeight) || 27;
+        toggle.hidden = body.scrollHeight <= lineHeight * 7 + 2;
+      }
+      if (!expanded) body.classList.add('preview');
+    });
+    $('loadMore').hidden = notes.length <= state.visibleCount;
     $('empty').hidden = notes.length > 0;
     $('emptyNew').textContent = state.search || state.reviewIds !== null ? '查看全部笔记 ↗' : '写一条笔记 ↗';
   }
@@ -407,6 +490,7 @@ body.linote-android .web-only{display:none!important}
   }
   function render() { renderSidebar(); renderNotes(); void renderSyncStatus(); }
   function chooseReview() {
+    state.view='notes';
     const ids = state.notes.map(n => n.id);
     const previous = state.reviewIds;
     for (let i=ids.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
@@ -442,6 +526,7 @@ body.linote-android .web-only{display:none!important}
     state.editing = note?.id || null;
     const parts = note ? splitNoteBody(note.body) : {text:'',images:[]};
     state.draftImages = draft?.images ? [...draft.images] : [...parts.images];
+    void hydrateLocalImages([{body:joinNoteBody('',state.draftImages)}]).then(renderEditorImages);
     $('editorTitle').textContent = note ? '编辑笔记' : '写一条笔记';
     const legacyTags = note ? note.tags.filter(tag => !inlineTopics(parts.text).includes(tag)) : [];
     $('noteBody').value = draft?.body ?? (parts.text + (legacyTags.length ? '\n' + legacyTags.map(tag => '#' + tag).join(' ') : '') + (!note && state.tag ? '\n#' + state.tag : ''));
@@ -449,30 +534,70 @@ body.linote-android .web-only{display:none!important}
     $('modalLayer').hidden = false;
     $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
-    setTimeout(() => $('noteBody').focus(), 0);
+    if (!note) setTimeout(() => $('noteBody').focus(), 0);
   }
   function closeEditor() {
+    clearTimeout(draftTimer);
     if (state.editing) clearEditorDraft(state.editing);
     else persistEditorDraft();
     $('modalLayer').hidden = true;
     document.body.style.overflow = '';
     state.editing = null;
   }
+  function showTrash() { state.view='trash'; state.tag=null; state.reviewIds=null; state.search=''; $('searchInput').value=''; closeSidebar(); render(); }
   async function deleteNote(id) {
-    if (!confirm('确定删除这条笔记吗？')) return;
+    if (!confirm('将这条笔记移入回收站？')) return;
+    const note=state.notes.find(item => item.id === id);
+    if (!note) return;
+    const deletedAt=new Date().toISOString();
     let queued = false;
-    try { await api('DELETE', undefined, id); }
+    let entry={id,kind:'note',item:note,deletedAt};
+    try { await uploadNoteImages(note); const result=await trashApi('POST',{kind:'note',id,item:note}); entry=result.entry; }
     catch (error) {
       if (!canQueueOffline(error)) { toast(error.message || '删除失败'); return; }
-      try { await queueChange({type:'delete',id,updatedAt:new Date().toISOString()}); queued = true; }
+      try { await queueChange({type:'trash',kind:'note',id,item:note,updatedAt:deletedAt}); queued = true; }
       catch { toast('本机存储不可用，删除失败'); return; }
     }
     if (!queued) await clearPending(id).catch(() => {});
     state.notes = state.notes.filter(n => n.id !== id);
-    try { await cacheNotes(); } catch { toast('本机缓存更新失败'); }
+    state.trash=[entry,...state.trash.filter(item => !(item.kind === 'note' && item.id === id))];
+    try { await Promise.all([cacheNotes(),cacheTrash()]); } catch { toast('本机缓存更新失败'); }
     if (state.reviewIds) state.reviewIds = state.reviewIds.filter(noteId => noteId !== id);
     if (state.tag && !tagCounts().has(state.tag)) state.tag = null;
-    render(); toast(queued ? '已在本机删除，联网后同步' : '笔记已删除');
+    render(); toast(queued ? '已移入本机回收站，联网后同步' : '已移入回收站');
+  }
+  async function restoreTrash(entry) {
+    let queued=false;
+    try { await trashApi('PUT',{kind:entry.kind,id:entry.id}); }
+    catch(error) {
+      if (!canQueueOffline(error)) { toast(error.message || '恢复失败'); return; }
+      try { await queueChange({type:'restore',kind:entry.kind,id:entry.id,item:entry.item,updatedAt:new Date().toISOString()}); queued=true; }
+      catch { toast('本机存储不可用，恢复失败'); return; }
+    }
+    if (!queued) await clearPending(entry.id).catch(()=>{});
+    state.trash=state.trash.filter(item => !(item.kind === entry.kind && item.id === entry.id));
+    if (entry.kind === 'note') { state.notes=[entry.item,...state.notes.filter(note=>note.id!==entry.id)]; await cacheNotes().catch(()=>{}); }
+    await cacheTrash().catch(()=>{}); render(); toast(queued ? '已在本机恢复，联网后同步' : '已恢复');
+  }
+  async function purgeTrash(entry) {
+    if (!confirm('彻底删除后无法恢复，确定继续吗？')) return;
+    let queued=false;
+    try { await trashApi('DELETE',undefined,entry.kind,entry.id); }
+    catch(error) {
+      if (!canQueueOffline(error)) { toast(error.message || '彻底删除失败'); return; }
+      try { await queueChange({type:'purge',kind:entry.kind,id:entry.id,updatedAt:new Date().toISOString()}); queued=true; }
+      catch { toast('本机存储不可用，删除失败'); return; }
+    }
+    if (!queued) await clearPending(entry.id).catch(()=>{});
+    state.trash=state.trash.filter(item => !(item.kind===entry.kind && item.id===entry.id));
+    if (entry.kind==='note') { state.notes=state.notes.filter(note=>note.id!==entry.id); await cacheNotes().catch(()=>{}); }
+    if (entry.kind==='note') for (const ref of splitNoteBody(entry.item.body).images.filter(value=>value.startsWith('/api/images/'))) {
+      if ([...state.notes,...state.trash.filter(item=>item.kind==='note').map(item=>item.item)].some(note=>note.body.includes(ref))) continue;
+      await deleteOfflineRecord(localImageKey(ref)).catch(()=>{});
+      const url=state.localImageUrls.get(ref); if (url) URL.revokeObjectURL(url);
+      state.localImageUrls.delete(ref);
+    }
+    await cacheTrash().catch(()=>{}); render(); toast(queued ? '已在本机彻底删除，联网后同步' : '已彻底删除');
   }
   async function saveNote(event) {
     event.preventDefault();
@@ -487,7 +612,7 @@ body.linote-android .web-only{display:none!important}
     } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags:inlineTopics(body), createdAt: now, updatedAt: now };
     $('saveNote').disabled = true;
     let queued = false;
-    try { await api('POST', note); }
+    try { await uploadNoteImages(note); await api('POST', note); }
     catch (error) {
       if (!canQueueOffline(error)) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
       try { await queueChange({type:'save',id:note.id,note,updatedAt:now}); queued = true; }
@@ -501,8 +626,8 @@ body.linote-android .web-only{display:none!important}
     const draftId = state.editing || null;
     closeEditor(); clearEditorDraft(draftId); render(); toast(queued ? '已保存在本机，联网后同步' : '笔记已保存');
   }
-  $('noteBody').addEventListener('input', () => { renderEditorHighlight(); persistEditorDraft(); });
-  $('noteBody').addEventListener('scroll',renderEditorHighlight);
+  $('noteBody').addEventListener('input', () => { renderEditorHighlight(); clearTimeout(draftTimer); draftTimer=setTimeout(persistEditorDraft,400); });
+  $('noteBody').addEventListener('scroll',syncEditorScroll,{passive:true});
   function exportNotes() {
     if (!state.account) { openAccount(); return; }
     const link = document.createElement('a');
@@ -510,12 +635,14 @@ body.linote-android .web-only{display:none!important}
   }
   ['newNoteSidebar','newNoteTop','mobileFab','emptyNew'].forEach(id => $(id).addEventListener('click', () => { if (id === 'emptyNew' && (state.search || state.reviewIds !== null)) { state.search = ''; state.reviewIds = null; $('searchInput').value = ''; render(); } else openEditor(); }));
   $('allNotes').addEventListener('click', () => setTag(null));
+  $('trashButton').addEventListener('click',showTrash);
   $('reviewNotes').addEventListener('click', chooseReview);
   $('reviewAgain').addEventListener('click', chooseReview);
   $('sortButton').addEventListener('click', () => { state.sort = state.sort === 'desc' ? 'asc' : 'desc'; renderSidebar(); });
   $('filterLabel').addEventListener('click',() => { state.noteSort=state.noteSort === 'updated' ? 'created' : 'updated'; renderNotes(); });
-  $('collapseAll').addEventListener('click',() => { state.allExpanded=!state.allExpanded; state.noteOpen.clear(); renderNotes(); });
-  $('searchInput').addEventListener('input', e => { state.reviewIds = null; state.search = e.target.value; render(); });
+  $('collapseAll').addEventListener('click',() => { state.allExpanded=!state.allExpanded; state.noteOpen.clear(); $('collapseAll').textContent=state.allExpanded ? '全部收起' : '全部展开'; $('collapseAll').setAttribute('aria-label',state.allExpanded ? '收起全部笔记至七行' : '展开全部笔记'); $('notes').children && [...$('notes').children].forEach(card => { const body=card.querySelector('.note-body'); const toggle=card.querySelector('.note-toggle'); card.dataset.expanded=String(state.allExpanded); card.className='note ' + (state.allExpanded ? 'expanded' : 'preview'); if (body) body.classList.toggle('preview',!state.allExpanded); if (toggle) { toggle.textContent=state.allExpanded ? '收起' : '展开'; toggle.setAttribute('aria-expanded',String(state.allExpanded)); } }); });
+  $('loadMore').addEventListener('click',() => { const top=window.scrollY; state.visibleCount+=30; renderNotes(); window.scrollTo(0,top); });
+  $('searchInput').addEventListener('input', e => { state.view='notes'; state.reviewIds = null; state.search = e.target.value; render(); });
   $('clearFilter').addEventListener('click', () => { state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = ''; render(); });
   $('calendarToggle').addEventListener('click', () => { const open = $('calendarPanel').hidden; $('calendarPanel').hidden = !open; $('calendarToggle').setAttribute('aria-expanded', String(open)); });
   document.addEventListener('click', e => { if (!$('calendarPanel').hidden && !$('calendarPanel').contains(e.target) && !$('calendarToggle').contains(e.target)) { $('calendarPanel').hidden = true; $('calendarToggle').setAttribute('aria-expanded','false'); } });
@@ -728,9 +855,18 @@ body.linote-android .web-only{display:none!important}
       const list = $('insightHistoryList'); list.replaceChildren();
       if (!data.insights.length) { list.textContent = '还没有洞察记录'; return; }
       data.insights.forEach(insight => {
+        const row=el('div','insight-history-row');
         const button = el('button','insight-history-item'); button.type = 'button';
         button.append(el('strong','',insight.title),el('span','',insight.scope + ' · ' + insight.noteCount + ' 条 · ' + formatDate(insight.createdAt)));
-        button.addEventListener('click',() => showInsightResult(insight)); list.append(button);
+        button.addEventListener('click',() => showInsightResult(insight));
+        const remove=el('button','insight-history-delete','删除'); remove.type='button'; remove.setAttribute('aria-label','删除洞察：'+insight.title);
+        remove.addEventListener('click',async () => {
+          if (!confirm('将这条洞察移入回收站？')) return;
+          remove.disabled=true;
+          try { const result=await trashApi('POST',{kind:'insight',id:insight.id}); state.trash=[result.entry,...state.trash]; await cacheTrash().catch(()=>{}); row.remove(); renderSidebar(); toast('已移入回收站'); }
+          catch(error) { remove.disabled=false; toast(error.message || '删除失败'); }
+        });
+        row.append(button,remove); list.append(row);
       });
     } catch(error) { $('insightHistoryList').textContent = error.message || '读取失败'; }
   }
@@ -820,7 +956,7 @@ body.linote-android .web-only{display:none!important}
     try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {}
     try { localStorage.removeItem(ACCOUNT_KEY); } catch {}
     try { await offlineRecord('last-account',''); } catch {}
-    state.account = null; state.notes = []; state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
+    state.account = null; state.notes = []; state.trash=[]; state.view='notes'; state.localImageUrls.forEach(url=>URL.revokeObjectURL(url)); state.localImageUrls.clear(); state.uploadedImages.clear(); state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
   });
   $('accountForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -834,7 +970,7 @@ body.linote-android .web-only{display:none!important}
       if (!response.ok) throw new Error(result.error || '服务暂时不可用，请稍后再试');
     } catch (error) { $('authSubmit').disabled = false; $('accountError').textContent = error.message || '登录失败'; return; }
     $('authSubmit').disabled = false;
-    state.account = account; state.notes = []; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
+    state.account = account; state.notes = []; state.trash=[]; state.view='notes'; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
     $('accountName').textContent = account;
     $('accountLayer').hidden = true;
     await rememberAccount(account);
@@ -971,7 +1107,7 @@ body.linote-android .web-only{display:none!important}
   }
   async function startApp() {
     const remembered = await rememberedAccount();
-    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); render(); }
+    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); await hydrateLocalImages([...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]); render(); }
     if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
