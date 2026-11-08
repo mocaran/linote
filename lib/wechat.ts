@@ -36,6 +36,10 @@ export function isWechatSaveCommand(body: string): boolean {
   return body.trim() === "以上";
 }
 
+export function isWechatDeleteCommand(body: string): boolean {
+  return body.trim() === "删除";
+}
+
 export function composeWechatNote(messages: { body: string }[]): string {
   return messages.map(message => message.body.trim()).filter(Boolean).join("\n");
 }

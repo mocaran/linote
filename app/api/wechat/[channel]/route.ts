@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { composeWechatNote, digestHex, isWechatSaveCommand, textReply, validWechatSignature, xmlField } from "../../../../lib/wechat";
+import { composeWechatNote, digestHex, isWechatDeleteCommand, isWechatSaveCommand, textReply, validWechatSignature, xmlField } from "../../../../lib/wechat";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export async function POST(request: Request, context: { params: Promise<{ channe
   const from = xmlField(xml, "ToUserName");
   if (!to || !from) return new Response("Invalid message", { status: 400 });
   const kind = xmlField(xml, "MsgType").toLowerCase();
-  if (kind === "event" && xmlField(xml, "Event").toLowerCase() === "subscribe") return textReply(to, from, "欢迎使用 linote。先在微信接入页面生成口令，发送“绑定 口令”。之后可连续发送文字，单独发送“以上”时合并保存为一篇笔记。");
+  if (kind === "event" && xmlField(xml, "Event").toLowerCase() === "subscribe") return textReply(to, from, "欢迎使用 linote。先在微信接入页面生成口令，发送“绑定 口令”。之后可连续发送文字，单独发送“以上”合并保存，发送“删除”清空未保存内容。");
   if (kind !== "text") return textReply(to, from, "目前支持发送文字。连续发送的文字会暂存，单独发送“以上”后合并保存。");
   const body = xmlField(xml, "Content").trim();
   if (!body) return new Response("success");
@@ -45,7 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ channe
       env.DB.prepare("INSERT INTO wechat_links (channel_id,openid,user_id,created_at) VALUES (?,?,?,?) ON CONFLICT(channel_id,openid) DO UPDATE SET user_id=excluded.user_id").bind(channelId, to, channel.user_id, new Date().toISOString()),
       env.DB.prepare("DELETE FROM wechat_bind_codes WHERE channel_id=? AND code_hash=?").bind(channelId, codeHash),
     ]);
-    return textReply(to, from, "已绑定 linote。现在可连续发送文字，单独发送“以上”后会合并保存为一篇笔记。");
+    return textReply(to, from, "已绑定 linote。连续发送文字后，单独发送“以上”可合并保存；单独发送“删除”可清空未保存内容。");
   }
   const link = await env.DB.prepare("SELECT user_id FROM wechat_links WHERE channel_id=? AND openid=?").bind(channelId, to).first<{user_id:string}>();
   if (!link) return textReply(to, from, "尚未绑定 linote。请在 linote 的微信接入页面生成口令，然后发送“绑定 口令”。");
@@ -55,15 +55,24 @@ export async function POST(request: Request, context: { params: Promise<{ channe
   const rawTime = Number(xmlField(xml, "CreateTime"));
   const createdAt = Number.isFinite(rawTime) && rawTime > 0 ? new Date(rawTime * 1000).toISOString() : new Date().toISOString();
   const isEnd = isWechatSaveCommand(body);
+  const isDelete = isWechatDeleteCommand(body);
+  const markerKind = isEnd ? "end" : isDelete ? "delete" : "text";
   await env.DB.prepare("INSERT OR IGNORE INTO wechat_inbox (channel_id,openid,message_id,kind,body,created_at) VALUES (?,?,?,?,?,?)")
-    .bind(channelId, to, stableId, isEnd ? "end" : "text", isEnd ? "" : body, createdAt).run();
-  if (!isEnd) return new Response("success");
+    .bind(channelId, to, stableId, markerKind, markerKind === "text" ? body : "", createdAt).run();
+  if (markerKind === "text") return new Response("success");
 
-  const marker = await env.DB.prepare("SELECT id FROM wechat_inbox WHERE channel_id=? AND openid=? AND message_id=? AND kind='end'")
-    .bind(channelId, to, stableId).first<{id:number}>();
+  const marker = await env.DB.prepare("SELECT id FROM wechat_inbox WHERE channel_id=? AND openid=? AND message_id=? AND kind=?")
+    .bind(channelId, to, stableId, markerKind).first<{id:number}>();
   if (!marker) return new Response("Message not found", {status:500});
-  const previous = await env.DB.prepare("SELECT MAX(id) AS id FROM wechat_inbox WHERE channel_id=? AND openid=? AND kind='end' AND id<?")
+  const previous = await env.DB.prepare("SELECT MAX(id) AS id FROM wechat_inbox WHERE channel_id=? AND openid=? AND kind IN ('end','delete') AND id<?")
     .bind(channelId, to, marker.id).first<{id:number|null}>();
+  if (isDelete) {
+    const pending = await env.DB.prepare("SELECT COUNT(*) AS count FROM wechat_inbox WHERE channel_id=? AND openid=? AND kind='text' AND body<>'' AND id>? AND id<?")
+      .bind(channelId, to, previous?.id ?? 0, marker.id).first<{count:number}>();
+    await env.DB.prepare("UPDATE wechat_inbox SET body='' WHERE channel_id=? AND openid=? AND kind='text' AND id>? AND id<?")
+      .bind(channelId, to, previous?.id ?? 0, marker.id).run();
+    return textReply(to, from, Number(pending?.count) ? "已清空这段未保存的文字。" : "当前没有待删除的文字。");
+  }
   const messages = await env.DB.prepare("SELECT body,created_at FROM wechat_inbox WHERE channel_id=? AND openid=? AND kind='text' AND id>? AND id<? ORDER BY id")
     .bind(channelId, to, previous?.id ?? 0, marker.id).all<{body:string;created_at:string}>();
   const noteBody = composeWechatNote(messages.results);
