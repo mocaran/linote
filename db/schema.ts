@@ -1,4 +1,4 @@
-import { sqliteTable, text, primaryKey, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const notes = sqliteTable("notes", {
   userId: text("user_id").notNull(),
@@ -68,3 +68,16 @@ export const wechatLinks = sqliteTable("wechat_links", {
   userId: text("user_id").notNull(),
   createdAt: text("created_at").notNull(),
 }, table => [primaryKey({columns:[table.channelId,table.openid]})]);
+
+export const wechatInbox = sqliteTable("wechat_inbox", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  channelId: text("channel_id").notNull(),
+  openid: text("openid").notNull(),
+  messageId: text("message_id").notNull(),
+  kind: text("kind").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+}, table => [
+  uniqueIndex("wechat_inbox_message_idx").on(table.channelId, table.messageId),
+  index("wechat_inbox_segment_idx").on(table.channelId, table.openid, table.id),
+]);

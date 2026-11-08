@@ -43,6 +43,13 @@
       "when": 1793791077751,
       "tag": "0005_brave_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794136256901,
+      "tag": "0006_brainy_scalphunter",
+      "breakpoints": true
     }
   ]
 }

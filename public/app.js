@@ -7,7 +7,7 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.17';
+  const APP_VERSION = '1.18';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;

@@ -32,6 +32,14 @@ export function xmlField(xml: string, name: string): string {
   return match ? (match[1] ?? decodeXml(match[2] ?? "")) : "";
 }
 
+export function isWechatSaveCommand(body: string): boolean {
+  return body.trim() === "以上";
+}
+
+export function composeWechatNote(messages: { body: string }[]): string {
+  return messages.map(message => message.body.trim()).filter(Boolean).join("\n");
+}
+
 export function textReply(to: string, from: string, content: string): Response {
   const cdata = (value: string) => `<![CDATA[${value.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]>`;
   const xml = `<xml><ToUserName>${cdata(to)}</ToUserName><FromUserName>${cdata(from)}</FromUserName><CreateTime>${Math.floor(Date.now() / 1000)}</CreateTime><MsgType><![CDATA[text]]></MsgType><Content>${cdata(content)}</Content></xml>`;
