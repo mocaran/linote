@@ -49,8 +49,8 @@ async function send(openid,messageId,content){
   const request=new Request(`https://linote.test/api/wechat/${channel}?timestamp=${timestamp}&nonce=${nonce}&signature=${signature}`,{method:'POST',body:xml});
   return (await routeModule.exports.POST(request,{params:Promise.resolve({channel})})).text();
 }
-await send('reader1','1','第一句 #日记');
-await send('reader1','2','第二句');
+assert.equal(await send('reader1','1','第一句 #日记'),'success');
+assert.equal(await send('reader1','2','第二句'),'success');
 assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM notes').get().count,0);
 assert.match(await send('reader1','3','以上'),/合并保存/);
 let notes=sqlite.prepare('SELECT body,tags FROM notes ORDER BY rowid').all();

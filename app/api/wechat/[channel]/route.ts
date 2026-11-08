@@ -57,7 +57,7 @@ export async function POST(request: Request, context: { params: Promise<{ channe
   const isEnd = isWechatSaveCommand(body);
   await env.DB.prepare("INSERT OR IGNORE INTO wechat_inbox (channel_id,openid,message_id,kind,body,created_at) VALUES (?,?,?,?,?,?)")
     .bind(channelId, to, stableId, isEnd ? "end" : "text", isEnd ? "" : body, createdAt).run();
-  if (!isEnd) return textReply(to, from, "已暂存。继续发送文字，最后单独发送“以上”即可合并保存。");
+  if (!isEnd) return new Response("success");
 
   const marker = await env.DB.prepare("SELECT id FROM wechat_inbox WHERE channel_id=? AND openid=? AND message_id=? AND kind='end'")
     .bind(channelId, to, stableId).first<{id:number}>();
