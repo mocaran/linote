@@ -3,11 +3,12 @@
   document.body.classList.toggle('linote-android', /LinoteAndroid\/\d+/.test(navigator.userAgent));
   const KEY = 'linote.notes.v1';
   const ACCOUNT_KEY = 'linote.account.v1';
+  const LOCAL_PREFIX = 'local-only:';
   const MIGRATION_KEY = 'linote.legacy-migrated.v1';
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.20';
+  const APP_VERSION = '1.21';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
@@ -15,14 +16,18 @@
 
   function normalizeAccount(raw) { return raw.trim().normalize('NFC'); }
   function validAccount(value) { return value && Array.from(value).length <= 32 && !/[\p{Cc}\p{Cf}]/u.test(value); }
-  function readAccount() { try { const value = normalizeAccount(localStorage.getItem(ACCOUNT_KEY) || ''); return validAccount(value) ? value : null; } catch { return null; } }
+  function isLocalAccount(value = state.account) { return typeof value === 'string' && value.startsWith(LOCAL_PREFIX) && validAccount(value.slice(LOCAL_PREFIX.length)); }
+  function displayAccount(value) { return isLocalAccount(value) ? value.slice(LOCAL_PREFIX.length) : value; }
+  function accountLabel(value) { return isLocalAccount(value) ? displayAccount(value) + ' · 仅本机' : displayAccount(value); }
+  function rememberedName(value) { return validAccount(value) || isLocalAccount(value); }
+  function readAccount() { try { const value = normalizeAccount(localStorage.getItem(ACCOUNT_KEY) || ''); return rememberedName(value) ? value : null; } catch { return null; } }
   async function rememberedAccount() {
     const local = readAccount();
     if (local) return local;
     try {
       const last = await offlineRecord('last-account');
       if (last === '') return null;
-      if (typeof last === 'string' && validAccount(last)) return last;
+      if (typeof last === 'string' && rememberedName(last)) return last;
       const db = await offlineDatabase();
       const keys = await new Promise((resolve,reject) => { const request=db.transaction('records').objectStore('records').getAllKeys(); request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error); });
       db.close();
@@ -76,6 +81,7 @@
     if (pending.some(item => item.id === id)) await offlineRecord(offlineKey('pending'),pending.filter(item => item.id !== id));
   }
   async function syncPending() {
+    if (isLocalAccount()) return true;
     const account = state.account;
     const key = offlineKey('pending',account);
     const pending = await pendingChanges(account);
@@ -124,7 +130,10 @@
     const account = state.account;
     const cached = await cachedNotes(account);
     if (state.account !== account) return;
-    if (cached.length) { state.notes = cached; state.trash=await cachedTrash(account); await hydrateLocalImages([...cached,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]); render(); if (navigator.onLine) void cacheRemoteImages([...cached,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)],account); }
+    const cachedDeleted = await cachedTrash(account);
+    if (state.account !== account) return;
+    if (cached.length || cachedDeleted.length) { state.notes = cached; state.trash=cachedDeleted; const localItems=[...cached,...cachedDeleted.filter(entry=>entry.kind==='note').map(entry=>entry.item)]; await hydrateLocalImages(localItems); render(); if (navigator.onLine && !isLocalAccount(account)) void cacheRemoteImages(localItems,account); }
+    if (isLocalAccount(account)) { render(); return; }
     if (!navigator.onLine) { toast('离线模式 · 改动将在联网后同步'); return; }
     try {
       if (!await syncPending()) { toast('待同步笔记已保存在此设备'); return; }
@@ -245,6 +254,7 @@
     img.src=imageSource(ref);
   }
   async function uploadNoteImages(note) {
+    if (isLocalAccount()) return;
     for (const ref of splitNoteBody(note.body).images) {
       if (!ref.startsWith('/api/images/') || state.uploadedImages.has(ref)) continue;
       const blob=await offlineRecord(localImageKey(ref));
@@ -507,6 +517,7 @@
   }
   async function renderSyncStatus() {
     const account = state.account;
+    if (isLocalAccount(account)) { $('syncStatus').textContent = '仅本机保存'; return; }
     const pending = account ? await pendingChanges(account) : [];
     if (account !== state.account) return;
     $('syncStatus').textContent = pending.length ? `待同步 ${pending.length} 条` : !navigator.onLine ? '离线 · 可继续记录' : '';
@@ -540,7 +551,7 @@
     const body = $('noteBody').value;
     if (body || state.draftImages.length) drafts.unshift({id,body,images:[...state.draftImages],updatedAt:new Date().toISOString()});
     writeDrafts(drafts);
-    $('editorHint').textContent = body || state.draftImages.length ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
+    $('editorHint').textContent = isLocalAccount() ? '草稿保存在此设备' : body || state.draftImages.length ? '草稿已保存在此设备 · 保存后同步到账号' : '保存后同步到当前账号';
   }
   function clearEditorDraft(id) { writeDrafts(readDrafts().filter(item => item.id !== id)); }
   function openEditor(id = null) {
@@ -555,7 +566,7 @@
     $('noteBody').value = draft?.body ?? (parts.text + (legacyTags.length ? '\n' + legacyTags.map(tag => '#' + tag).join(' ') : '') + (!note && state.tag ? '\n#' + state.tag : ''));
     renderEditorHighlight(); renderEditorImages();
     $('modalLayer').hidden = false;
-    $('editorHint').textContent = draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
+    $('editorHint').textContent = isLocalAccount() ? (draft ? '已恢复本机草稿' : '仅保存在此设备') : draft ? '已恢复草稿 · 保存后同步到账号' : '保存后同步到当前账号';
     document.body.style.overflow = 'hidden';
     if (!note) setTimeout(() => $('noteBody').focus(), 0);
   }
@@ -575,7 +586,7 @@
     const deletedAt=new Date().toISOString();
     let queued = false;
     let entry={id,kind:'note',item:note,deletedAt};
-    try { await uploadNoteImages(note); const result=await trashApi('POST',{kind:'note',id,item:note}); entry=result.entry; }
+    try { if (!isLocalAccount()) { await uploadNoteImages(note); const result=await trashApi('POST',{kind:'note',id,item:note}); entry=result.entry; } }
     catch (error) {
       if (!canQueueOffline(error)) { toast(error.message || '删除失败'); return; }
       try { await queueChange({type:'trash',kind:'note',id,item:note,updatedAt:deletedAt}); queued = true; }
@@ -591,7 +602,7 @@
   }
   async function restoreTrash(entry) {
     let queued=false;
-    try { await trashApi('PUT',{kind:entry.kind,id:entry.id}); }
+    try { if (!isLocalAccount()) await trashApi('PUT',{kind:entry.kind,id:entry.id}); }
     catch(error) {
       if (!canQueueOffline(error)) { toast(error.message || '恢复失败'); return; }
       try { await queueChange({type:'restore',kind:entry.kind,id:entry.id,item:entry.item,updatedAt:new Date().toISOString()}); queued=true; }
@@ -605,7 +616,7 @@
   async function purgeTrash(entry) {
     if (!confirm('彻底删除后无法恢复，确定继续吗？')) return;
     let queued=false;
-    try { await trashApi('DELETE',undefined,entry.kind,entry.id); }
+    try { if (!isLocalAccount()) await trashApi('DELETE',undefined,entry.kind,entry.id); }
     catch(error) {
       if (!canQueueOffline(error)) { toast(error.message || '彻底删除失败'); return; }
       try { await queueChange({type:'purge',kind:entry.kind,id:entry.id,updatedAt:new Date().toISOString()}); queued=true; }
@@ -635,7 +646,7 @@
     } else note = { id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(), body:joinNoteBody(body,state.draftImages), tags:inlineTopics(body), createdAt: now, updatedAt: now };
     $('saveNote').disabled = true;
     let queued = false;
-    try { await uploadNoteImages(note); await api('POST', note); }
+    try { if (!isLocalAccount()) { await uploadNoteImages(note); await api('POST', note); } }
     catch (error) {
       if (!canQueueOffline(error)) { $('saveNote').disabled = false; toast(error.message || '保存失败'); return; }
       try { await queueChange({type:'save',id:note.id,note,updatedAt:now}); queued = true; }
@@ -643,8 +654,9 @@
     }
     if (!queued) await clearPending(note.id).catch(() => {});
     $('saveNote').disabled = false;
+    const previousNotes = state.notes;
     state.notes = [note, ...state.notes.filter(n => n.id !== note.id)];
-    try { await cacheNotes(); } catch { if (queued) { toast('本机缓存失败，请保留当前页面'); return; } }
+    try { await cacheNotes(); } catch { if (queued || isLocalAccount()) { state.notes=previousNotes; $('saveNote').disabled=false; toast('本机存储失败，请保留当前页面'); return; } }
     state.reviewIds = null;
     const draftId = state.editing || null;
     closeEditor(); clearEditorDraft(draftId); render(); toast(queued ? '已保存在本机，联网后同步' : '笔记已保存');
@@ -653,6 +665,7 @@
   $('noteBody').addEventListener('scroll',syncEditorScroll,{passive:true});
   function exportNotes() {
     if (!state.account) { openAccount(); return; }
+    if (isLocalAccount()) { toast('仅本机档案暂不支持导出'); return; }
     const link = document.createElement('a');
     link.href = '/api/notes/export'; link.download = 'linote-' + new Date().toISOString().slice(0,10) + '.json'; link.click();
   }
@@ -724,6 +737,7 @@
   }
   async function openInsight() {
     if (!state.account) { openAccount(); return; }
+    if (isLocalAccount()) { toast('仅本机档案暂不支持洞察'); return; }
     refreshInsightScope(); showInsightPanel('insightHome'); $('insightLayer').hidden = false;
     document.body.style.overflow = 'hidden'; closeSidebar();
     try { await syncInsightKey(); } catch (error) { $('insightMessage').textContent = error.message || '密钥同步失败'; }
@@ -922,12 +936,18 @@
     state.authMode = mode;
     $('authLoginTab').classList.toggle('active', mode === 'login');
     $('authRegisterTab').classList.toggle('active', mode === 'register');
-    $('authSubmit').textContent = mode === 'register' ? '创建账号并进入' : '登录';
-    $('accountTitle').textContent = mode === 'register' ? '创建 linote 账号' : '登录 linote';
+    $('authLocalTab').classList.toggle('active', mode === 'local');
+    $('passwordRow').hidden = mode === 'local';
+    $('authSubmit').textContent = mode === 'local' ? '开始本机记录' : mode === 'register' ? '创建账号并进入' : '登录';
+    $('accountTitle').textContent = mode === 'local' ? '创建本机档案' : mode === 'register' ? '创建 linote 账号' : '登录 linote';
+    $('accountDescription').textContent = mode === 'local' ? '给这台设备上的笔记取个名字，不需要网络或密码。' : '用账号和密码同步你的笔记，账号名可以是中文。';
+    $('accountInputLabel').textContent = mode === 'local' ? '档案名称' : '账号';
+    $('accountInput').placeholder = mode === 'local' ? '例如：妈妈的笔记' : '输入账号名';
+    $('accountWarning').textContent = mode === 'local' ? '笔记和图片只保存在这台设备。不会自动同步；卸载应用或清除应用数据会丢失。' : '旧编号可作为账号名，首次使用请选择“创建账号”设置密码。请记住密码，目前无法找回。';
     $('passwordInput').autoComplete = mode === 'register' ? 'new-password' : 'current-password';
     $('accountError').textContent = '';
   }
-  function openAccount() { $('accountInput').value = state.account || readAccount() || ''; $('passwordInput').value = ''; setAuthMode('login'); $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
+  function openAccount(mode) { const remembered=state.account || readAccount() || ''; $('accountInput').value = displayAccount(remembered); $('passwordInput').value = ''; setAuthMode(mode || (isLocalAccount(remembered) ? 'local' : 'login')); $('accountLayer').hidden = false; setTimeout(() => $('accountInput').focus(),0); }
   async function wechatApi(method, payload) {
     const response = await fetch('/api/wechat/setup', {method,headers:payload ? {'Content-Type':'application/json'} : {},body:payload ? JSON.stringify(payload) : undefined,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(8000)});
     const result = await response.json().catch(() => ({}));
@@ -955,6 +975,7 @@
   }
   async function openWechat() {
     if (!state.account) { openAccount(); return; }
+    if (isLocalAccount()) { toast('仅本机档案暂不支持微信接入'); return; }
     closeSidebar();
     $('wechatLayer').hidden = false;
     $('wechatMessage').textContent = '正在读取接入配置…';
@@ -994,8 +1015,9 @@
   });
   $('authLoginTab').addEventListener('click', () => setAuthMode('login'));
   $('authRegisterTab').addEventListener('click', () => setAuthMode('register'));
+  $('authLocalTab').addEventListener('click', () => setAuthMode('local'));
   $('switchAccount').addEventListener('click', async () => {
-    try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {}
+    if (!isLocalAccount()) { try { await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'}),credentials:'same-origin',signal:AbortSignal.timeout(3000)}); } catch {} }
     try { localStorage.removeItem(ACCOUNT_KEY); } catch {}
     try { await offlineRecord('last-account',''); } catch {}
     state.account = null; state.notes = []; state.trash=[]; state.view='notes'; state.localImageUrls.forEach(url=>URL.revokeObjectURL(url)); state.localImageUrls.clear(); state.uploadedImages.clear(); state.tag = null; state.reviewIds = null; state.chatMessages = []; state.chatScope = ''; state.search = ''; $('searchInput').value = ''; $('accountName').textContent = '未登录'; render(); closeSidebar(); openAccount();
@@ -1006,16 +1028,16 @@
     const password = $('passwordInput').value;
     if (!validAccount(account)) { $('accountError').textContent = '账号需为 1 至 32 个字符'; return; }
     $('authSubmit').disabled = true;
-    try {
+    if (state.authMode !== 'local') try {
       const response = await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:state.authMode,username:account,password}),credentials:'same-origin'});
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || '服务暂时不可用，请稍后再试');
     } catch (error) { $('authSubmit').disabled = false; $('accountError').textContent = error.message || '登录失败'; return; }
     $('authSubmit').disabled = false;
-    state.account = account; state.notes = []; state.trash=[]; state.view='notes'; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
-    $('accountName').textContent = account;
+    state.account = state.authMode === 'local' ? LOCAL_PREFIX + account : account; state.notes = []; state.trash=[]; state.view='notes'; state.tag = null; state.reviewIds = null; state.search = ''; $('searchInput').value = '';
+    $('accountName').textContent = accountLabel(state.account);
     $('accountLayer').hidden = true;
-    await rememberAccount(account);
+    await rememberAccount(state.account);
     closeSidebar(); render(); await loadFromAccount();
   });
   function openSidebar() { $('sidebar').classList.add('open'); $('mobileShade').hidden = false; }
@@ -1097,6 +1119,7 @@
   $('exportButton').addEventListener('click', exportNotes);
   $('importFlomoButton').addEventListener('click', () => {
     if (!state.account) { openAccount(); return; }
+    if (isLocalAccount()) { toast('仅本机档案暂不支持导入'); return; }
     $('importFlomoFile').value = '';
     $('importFlomoFile').click();
   });
@@ -1149,15 +1172,17 @@
   }
   async function startApp() {
     const remembered = await rememberedAccount();
-    if (remembered) { state.account=remembered; $('accountName').textContent=remembered; state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); const localItems=[...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]; await hydrateLocalImages(localItems); render(); if (navigator.onLine) void cacheRemoteImages(localItems,remembered); }
-    if (!navigator.onLine) { if (!remembered) openAccount(); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
+    if (remembered) { state.account=remembered; $('accountName').textContent=accountLabel(remembered); state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); const localItems=[...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]; await hydrateLocalImages(localItems); render(); if (navigator.onLine && !isLocalAccount(remembered)) void cacheRemoteImages(localItems,remembered); }
+    if (isLocalAccount()) return;
+    if (!remembered && document.body.classList.contains('linote-android')) { openAccount('local'); return; }
+    if (!navigator.onLine) { if (!remembered) openAccount('local'); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
       if (response.status === 401) { if (!remembered) openAccount(); else toast('账号会话已过期，重新登录后可同步'); return; }
       if (!response.ok) throw new Error('账号服务暂时不可用');
       const user = await response.json();
       state.account = user.username; $('accountName').textContent = user.username; await rememberAccount(user.username); await loadFromAccount();
-    } catch { if (!remembered) openAccount(); else toast('连接不可用 · 已打开本机笔记'); }
+    } catch { if (!remembered) openAccount('local'); else toast('连接不可用 · 已打开本机笔记'); }
   }
   window.addEventListener('online',() => { if (state.account) loadFromAccount(); });
   startApp();
