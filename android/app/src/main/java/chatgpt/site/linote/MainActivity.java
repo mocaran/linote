@@ -13,9 +13,11 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.view.MotionEvent;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -39,6 +41,7 @@ public class MainActivity extends Activity {
     private static final String HOME = "https://linote-notes-20261103.thinmerit.chatgpt.site/";
     private static final String HOST = "linote-notes-20261103.thinmerit.chatgpt.site";
     private WebView webView;
+    private FrameLayout root;
     private float touchStartX;
     private float touchStartY;
     private boolean swipeHandled;
@@ -46,12 +49,40 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> imagePickerCallback;
     private static final int IMAGE_PICKER_REQUEST = 7;
 
+    private void applyAppearance(String color, boolean dark) {
+        if (color == null || !color.matches("#[0-9a-fA-F]{6}")) return;
+        int background = Color.parseColor(color);
+        root.setBackgroundColor(background);
+        webView.setBackgroundColor(background);
+        getWindow().setStatusBarColor(background);
+        getWindow().setNavigationBarColor(background);
+        int flags = getWindow().getDecorView().getSystemUiVisibility();
+        int lightBars = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        getWindow().getDecorView().setSystemUiVisibility(dark ? flags & ~lightBars : flags | lightBars);
+    }
+
+    public class AppearanceBridge {
+        @JavascriptInterface
+        public boolean isSystemDark() {
+            return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+
+        @JavascriptInterface
+        public void setTheme(String color, boolean dark) {
+            if (color == null || !color.matches("#[0-9a-fA-F]{6}")) return;
+            runOnUiThread(() -> {
+                applyAppearance(color, dark);
+                getSharedPreferences("appearance", MODE_PRIVATE).edit().putString("color", color).putBoolean("dark", dark).apply();
+            });
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         webView = new WebView(this);
         webView.setBackgroundColor(Color.rgb(250, 250, 250));
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(250, 250, 250));
         root.addView(webView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         if (Build.VERSION.SDK_INT >= 35) {
@@ -62,6 +93,9 @@ public class MainActivity extends Activity {
             });
         }
         setContentView(root);
+        android.content.SharedPreferences appearance = getSharedPreferences("appearance", MODE_PRIVATE);
+        applyAppearance(appearance.getString("color", "#fcfcfc"), appearance.getBoolean("dark", false));
+        webView.addJavascriptInterface(new AppearanceBridge(), "LinoteAppearance");
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -314,6 +348,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (webView != null) webView.evaluateJavascript("window.dispatchEvent(new Event('linote-system-theme'))", null);
         if (pendingApkUri != null && (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls())) installUpdate(pendingApkUri);
     }
 

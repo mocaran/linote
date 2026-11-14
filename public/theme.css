@@ -1,0 +1,92 @@
+/* Shared appearance tokens cover the web shell, offline shell and Android assets. */
+html[data-theme],html[data-theme] body{background:var(--t-bg);color:var(--t-ink)}
+html[data-theme] body{accent-color:var(--t-accent-text)}
+html[data-theme] .sidebar{background:var(--t-sidebar);border-color:var(--t-line)}
+html[data-theme] :is(.topbar,.editor,.account-dialog,.wechat-dialog,.insight-header,.mini-stats,.calendar-toggle,.insight-card,.insight-custom,.insight-history-item,.range-field,.insight-chat-message,.ai-reasoning,.load-more){background:var(--t-paper);border-color:var(--t-line);color:var(--t-ink)}
+html[data-theme] :is(.note,.editor-footer){background:var(--t-paper);border-color:var(--t-line)}
+html[data-theme] .insight-dialog{background:var(--t-bg)}
+html[data-theme] :is(.brand strong,.crumb strong,.note-body,.ai-heading,.trash-title,#insightResultBody,.insight-card strong,.insight-custom label,.account-dialog label,.range-field){color:var(--t-ink)}
+html[data-theme] :is(.brand small,.nav-count,.topic-count,.section-heading,.topic-hint,.note-top,.note-actions button,.feed-heading span,.mini-stats-title,.mini-stats-title strong,.calendar-toggle small,.calendar-day-detail,.account-dialog p,.account-dialog .account-warning,.insight-scope,.insight-scope #insightRangeSummary,.insight-card small,.insight-privacy,.insight-chat-scope,#insightResultMeta,.insight-history-item span,.insight-header button,#insightKeyPanel p,.ai-reasoning,.trash-excerpt,.wechat-dialog p,.wechat-dialog label,.wechat-linked,.search,.search kbd,.editor-footer>span){color:var(--t-muted)}
+html[data-theme] .sidebar-bottom{border-color:var(--t-line)}
+html[data-theme] body .sidebar-bottom .account-name{color:var(--t-muted)}
+html[data-theme] body .sidebar-bottom button{color:var(--t-accent-text)}
+html[data-theme] :is(.nav-item,.topic-item){color:var(--t-ink)}
+html[data-theme] :is(.nav-item:hover,.topic-item:hover,.note-actions button:hover,.tag-suggestions button:hover,.calendar-toggle:hover,.calendar-toggle[aria-expanded="true"],.insight-card:hover,.insight-history-item:hover){background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] :is(.nav-item.active,.topic-item.active,.note-tags button,.selected-tag,.insight-chat-message.user,.wechat-code){background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] :is(.hash,.topic-item.active .hash,.section-heading button,.feed-heading button,.feed-heading #filterLabel,.inline-topic,.calendar-toggle>span,.insight-card>span,.insight-scope #insightRangeButton,.insight-back,.insight-key-actions .plain,.insight-chat-message strong,.ai-reasoning summary,.insight-history-delete,.load-more){color:var(--t-accent-text)}
+html[data-theme] .note-toggle{color:var(--t-accent-text)!important}
+html[data-theme] body .sidebar-tools button:hover,html[data-theme] body .sidebar-tools #trashButton.active{background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] .sidebar-tools #trashButton{border-color:var(--t-line)}
+html[data-theme] .feed-heading #filterLabel:disabled{color:var(--t-muted)}
+html[data-theme] :is(.new-button,.top-new,.empty button,.save,.mobile-fab,.account-dialog form button,.insight-custom button,.insight-key-actions button:not(.plain),.insight-chat-form button,.range-apply,.wechat-dialog>button,.wechat-dialog #wechatCodeButton,.wechat-channel .wechat-code-button){background:var(--t-accent);color:var(--t-on-accent);box-shadow:none}
+html[data-theme] :is(.new-button,.top-new,.empty button,.save,.account-dialog form button,.insight-custom button,.range-apply):hover{background:var(--t-accent-hover)}
+html[data-theme] :is(.search,.wechat-channel){background:var(--t-field);border-color:var(--t-line)}
+html[data-theme] :is(.account-dialog input,.insight-custom textarea,.insight-chat-form textarea,#insightKeyInput,.range-field select,.range-custom input,.wechat-dialog input,.wechat-copy-row button,.add-image){background:var(--t-field);border-color:var(--t-line);color:var(--t-ink)}
+html[data-theme] :is(.search:focus-within,.account-dialog input:focus,.insight-custom textarea:focus,.insight-chat-form textarea:focus,#insightKeyInput:focus){border-color:var(--t-accent-text)}
+html[data-theme] :is(input,textarea)::placeholder{color:var(--t-muted);opacity:.8}
+html[data-theme] :is(.add-image,.wechat-copy-row button,.cancel,.editor-header button){color:var(--t-accent-text)}
+html[data-theme] .cancel{background:var(--t-field);border-color:var(--t-line)}
+html[data-theme] :is(.cancel:hover,.editor-header button:hover){background:var(--t-soft)}
+html[data-theme] .note-tags button:hover{background:var(--t-soft);color:var(--t-accent-text)}
+html[data-theme] :is(.editor-header,.editor-footer,.auth-tabs,.insight-header){border-color:var(--t-line)}
+html[data-theme] .auth-tabs button{color:var(--t-muted)}
+html[data-theme] .auth-tabs button.active{color:var(--t-accent-text);border-color:var(--t-accent-text)}
+html[data-theme] :is(.account-dialog form small,#wechatMessage,.insight-message){color:var(--t-danger)}
+html[data-theme] .sync-status{color:var(--t-muted)}
+html[data-theme] .editor-writing .note-highlight{color:var(--t-ink)}
+html[data-theme] .editor-writing #noteBody{caret-color:var(--t-ink)}
+html[data-theme] .plain-long-note .editor-writing #noteBody{color:var(--t-ink)}
+html[data-theme] .calendar-cell{background:var(--t-line)}
+html[data-theme] .calendar-cell.level-1{background:color-mix(in srgb,var(--t-accent) 25%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-2{background:color-mix(in srgb,var(--t-accent) 50%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-3{background:color-mix(in srgb,var(--t-accent) 75%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-4{background:var(--t-accent)}
+html[data-theme] .calendar-cell:focus-visible{outline-color:var(--t-accent-text)}
+html[data-theme] :is(.modal-backdrop,.insight-backdrop,.wechat-backdrop,.mobile-shade:not([hidden])){background:var(--t-overlay)}
+html[data-theme] .account-layer{background:var(--t-overlay)}
+html[data-theme] .toast{background:var(--t-ink);color:var(--t-paper)}
+html[data-theme] .note:hover{box-shadow:none}
+html[data-theme] button:focus-visible{outline:2px solid var(--t-accent-text);outline-offset:3px}
+/* Appearance sheet */
+.theme-open{overflow:hidden}
+.sidebar-tools #themeButton{grid-column:1/-1}
+.theme-layer{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;overscroll-behavior:contain}
+.theme-backdrop{position:absolute;inset:0;background:var(--t-overlay)}
+.theme-dialog{position:relative;width:min(640px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;border:1px solid var(--t-line);border-radius:20px;background:var(--t-paper);box-shadow:var(--t-shadow);overflow:hidden;color:var(--t-ink)}
+.theme-dialog header{display:flex;justify-content:space-between;align-items:center;padding:25px 28px 20px;border-bottom:1px solid var(--t-line);flex:none}
+.theme-dialog h2{margin:0;font-size:23px;letter-spacing:-.5px;font-weight:650}
+.theme-dialog header p{font-size:12px;color:var(--t-muted);margin:7px 0 0}
+.theme-dialog #themeClose{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;background:var(--t-field);color:var(--t-muted);font-size:26px;line-height:1}
+.theme-content{padding:23px 28px;overflow-y:auto;overscroll-behavior:contain}
+.theme-dialog fieldset{margin:0 0 24px;padding:0;border:0;min-width:0}
+.theme-dialog legend{padding:0;margin-bottom:12px;font-size:13px;font-weight:650}
+.theme-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:5px;border-radius:11px;background:var(--t-field)}
+.theme-modes button{border:1px solid transparent;border-radius:8px;padding:10px 4px;background:transparent;color:var(--t-muted);font-size:13px;white-space:nowrap}
+.theme-modes button[aria-pressed="true"]{background:var(--t-paper);border-color:var(--t-line);color:var(--t-accent-text);font-weight:650;box-shadow:0 2px 6px #00000008}
+.theme-palettes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.theme-palette{padding:5px;border:2px solid transparent;border-radius:12px;background:transparent;color:var(--t-ink);min-width:0;text-align:left}
+.theme-palette[aria-pressed="true"]{border-color:var(--t-accent-text);background:var(--t-soft)}
+.theme-sample{display:flex;height:64px;padding:8px;gap:7px;background:var(--sample-bg);border:1px solid var(--t-line);border-radius:7px;pointer-events:none}
+.theme-sample>i{width:12px;flex:none;background:var(--sample-accent);border-radius:3px;opacity:.85}
+.theme-sample>span{flex:1;min-width:0;padding:7px;background:var(--sample-paper);border-radius:4px}
+.theme-sample b,.theme-sample em{display:block;border-radius:2px;height:3px;margin-bottom:6px;background:var(--sample-ink);opacity:.32}
+.theme-sample b{width:45%;background:var(--sample-accent);opacity:1}.theme-sample em:last-child{width:65%}
+.theme-palette-label{display:flex;align-items:center;justify-content:space-between;padding:7px 3px 2px;font-size:12px}
+.theme-check{visibility:hidden;color:var(--t-accent-text);font-weight:bold}.theme-palette[aria-pressed="true"] .theme-check{visibility:visible}
+.theme-custom-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px;font-size:13px}
+.theme-custom-row label small{display:block;font-size:11px;color:var(--t-muted);margin-top:5px}
+.theme-color-input{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--t-line);border-radius:8px;background:var(--t-field)}
+.theme-color-input input[type="color"]{padding:0;width:28px;height:28px;border:0;background:transparent;cursor:pointer}
+.theme-color-input input[type="text"]{width:75px;padding:0;border:0;background:transparent;color:var(--t-ink);font:12px monospace;outline:0}
+.theme-custom-row output{color:var(--t-accent-text);font-size:12px}
+#themeTint{display:block;width:100%;margin:0;accent-color:var(--t-accent-text);touch-action:pan-x;height:24px}
+.theme-range-labels{display:flex;justify-content:space-between;color:var(--t-muted);font-size:10px;margin-top:3px}
+.theme-preview{background:var(--t-bg);border:1px solid var(--t-line);border-radius:12px;padding:17px}
+.theme-preview-card{padding:16px 18px;border:1px solid var(--t-line);border-radius:9px;background:var(--t-paper)}
+.theme-preview-card small{color:var(--t-muted);font-size:11px}.theme-preview-card p{font-size:14px;margin:10px 0 12px;line-height:1.7}
+.theme-preview-tag{background:var(--t-soft);color:var(--t-accent-text);border-radius:5px;padding:4px 7px;font-size:12px}
+.theme-dialog footer{border-top:1px solid var(--t-line);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex:none}
+.theme-dialog footer span{font-size:11px;color:var(--t-muted)}
+.theme-dialog footer button{border:0;background:transparent;color:var(--t-accent-text);font-size:12px;white-space:nowrap;padding:8px 0}
+@media(max-width:620px){.theme-layer{padding:12px}.theme-dialog{border-radius:15px;max-height:calc(100dvh - 24px)}.theme-dialog header{padding:20px}.theme-content{padding:20px}.theme-palettes{gap:5px}.theme-palette{padding:3px;border-radius:9px}.theme-sample{height:53px;padding:5px;gap:4px}.theme-sample>i{width:8px}.theme-sample>span{padding:6px 4px}.theme-dialog footer{padding:12px 20px}.theme-color-input{gap:4px}.theme-custom-row label small{max-width:180px;font-size:10px}.theme-palette-label{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.theme-dialog *{transition:none!important}}

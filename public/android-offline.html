@@ -75,7 +75,236 @@ body.linote-android .web-only{display:none!important}
 .modal-layer{padding:0}.editor{width:100%;height:100dvh;max-height:100dvh;border-radius:0;display:flex;flex-direction:column}.editor #noteForm{display:flex;flex-direction:column;flex:1;min-height:0}.editor-writing{position:relative;flex:1;min-height:0}.editor-writing #noteBody,.editor-writing .note-highlight{position:absolute;inset:0;width:100%;height:100%;max-height:none;min-height:0;margin:0;padding:28px max(28px,calc((100vw - 980px)/2));font:inherit;font-size:17px;line-height:1.9;letter-spacing:normal;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4}.editor-writing #noteBody{z-index:1;resize:none;background:transparent;color:transparent;caret-color:#333;overflow:auto}.editor-writing #noteBody::placeholder{color:#b6b6b6}.editor-writing #noteBody::selection{background:#d9bbbb99}.editor-writing .note-highlight{z-index:0;pointer-events:none;overflow:hidden;color:#333}.editor-images{padding-left:max(28px,calc((100vw - 980px)/2));padding-right:max(28px,calc((100vw - 980px)/2))}
 .insight-dialog.chat-expanded{width:100vw;max-width:none;height:100dvh;max-height:100dvh;border-radius:0}.insight-dialog.chat-expanded .insight-content{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px max(22px,calc((100vw - 1100px)/2))}.insight-dialog.chat-expanded #insightChat{max-width:none;width:100%;flex:1;min-height:0;display:flex;flex-direction:column}.insight-dialog.chat-expanded .insight-chat-messages{flex:1;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding:12px 5px 24px}.insight-dialog.chat-expanded .insight-chat-message{max-width:min(85%,850px)}.insight-dialog.chat-expanded .insight-chat-form{flex:none;margin-top:8px}.insight-dialog.chat-expanded .insight-chat-form textarea{min-height:65px;max-height:150px}.insight-dialog.chat-expanded .insight-message{min-height:0;margin-top:3px}
 @media(max-width:620px){.editor-writing #noteBody,.editor-writing .note-highlight{padding:22px 19px;font-size:16px}.editor-header{padding:18px 20px}.editor-images{padding:0 19px 12px}.insight-dialog.chat-expanded .insight-content{padding:14px 15px}.insight-dialog.chat-expanded .insight-chat-message{max-width:96%}.insight-dialog.chat-expanded .insight-chat-form{flex-direction:row}.insight-dialog.chat-expanded .insight-chat-form textarea{min-height:55px}.insight-layer:has(.chat-expanded){padding:0}.feed-heading{gap:4px}.feed-heading>div{gap:5px}.feed-actions{gap:2px}.feed-actions #collapseAll{font-size:11px}}
-</style><div class="app-shell"><div class="mobile-shade" id="mobileShade" hidden=""></div><aside class="sidebar" id="sidebar"><div class="brand"><div><strong>linote</strong><small>保卫个人史</small></div></div><button class="new-button" id="newNoteSidebar" type="button"><span aria-hidden="true">＋</span> 写一条笔记 <kbd>N</kbd></button><button class="calendar-toggle" id="calendarToggle" type="button" aria-expanded="false"><span>▦</span> 每日记录 <small id="todayCount">今日 0 条</small></button><div class="mini-stats" id="calendarPanel" hidden=""><div class="mini-stats-title"><span>近 35 天</span><strong id="totalStats">共 0 条笔记</strong></div><div class="mini-calendar" id="miniCalendar" aria-label="最近 35 天笔记数量"></div><div class="calendar-day-detail" id="calendarDayDetail">点选日期查看笔记数量</div></div><div class="side-section"><button class="nav-item active" id="allNotes" type="button"><span class="nav-icon">▦</span><span>全部笔记</span><span class="nav-count" id="allCount">0</span></button><button class="nav-item" id="reviewNotes" type="button"><span class="nav-icon">↻</span><span>回顾</span><span class="nav-count">10</span></button><button class="nav-item" id="insightButton" type="button"><span class="nav-icon">✧</span><span>洞察</span></button></div><div class="side-section topic-section"><div class="section-heading"><span>话题</span><button type="button" id="sortButton" title="切换话题排序" aria-label="切换话题排序">笔记数 ↓</button></div><div class="topic-list" id="topicList"></div><p class="topic-hint" id="topicHint">添加话题后，会自动出现在这里。</p></div><div class="sidebar-bottom"><span class="account-name" id="accountName">未登录</span><div class="sidebar-tools"><button type="button" id="switchAccount">切换账号</button><button type="button" id="checkUpdate">检查更新</button><button type="button" id="exportButton">导出</button><button type="button" id="importFlomoButton">导入</button><button type="button" class="web-only" id="wechatButton">微信接入</button><button type="button" id="trashButton">回收站 <span id="trashCount"></span></button></div><input id="importFlomoFile" type="file" accept=".html,text/html" aria-label="选择 flomo 导出文件" hidden=""/></div></aside><main class="main"><header class="topbar"><button class="mobile-menu" type="button" id="mobileMenu" aria-label="打开菜单">☰</button><div class="crumb"><strong id="pageTitle">全部笔记</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus" aria-live="polite"></span><label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索笔记或话题" aria-label="搜索笔记或话题"/><kbd>Ctrl K</kbd></label><button class="top-new" id="newNoteTop" type="button">＋ <span>新笔记</span></button></div></header><div class="content"><div class="feed-heading"><div><strong id="resultCount">0 条笔记</strong><button type="button" id="filterLabel" aria-label="切换笔记排序">按最近编辑排序 ▾</button></div><div class="feed-actions"><button type="button" id="reviewAgain" hidden="">换一组 ↻</button><button type="button" id="clearFilter" hidden="">清除筛选 ×</button><button type="button" id="collapseAll" aria-label="展开全部笔记">全部展开</button></div></div><section class="notes" id="notes" aria-live="polite"></section><button type="button" class="load-more" id="loadMore" hidden="">加载更多笔记</button><section class="empty" id="empty"><button type="button" id="emptyNew">写一条笔记 <span>↗</span></button></section></div><button class="mobile-fab" id="mobileFab" type="button" aria-label="写一条笔记">＋</button></main></div><div class="modal-layer" id="modalLayer" hidden=""><div class="modal-backdrop" id="modalBackdrop"></div><section class="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle"><div class="editor-header"><h2 id="editorTitle">写一条笔记</h2><button type="button" id="closeEditor" aria-label="关闭编辑器">×</button></div><form id="noteForm"><div class="editor-writing"><div id="noteHighlight" class="note-highlight" aria-hidden="true"></div><textarea id="noteBody" placeholder="现在的想法是… 在正文中输入 #话题" maxLength="20000" spellCheck="false" data-gramm="false"></textarea></div><div class="editor-images" id="editorImages"></div><div class="editor-footer"><button type="button" class="add-image" id="addImage">＋ 图片</button><input id="imageInput" type="file" accept="image/*" multiple="" hidden=""/><span id="editorHint">保存后同步到当前账号</span><div><button type="button" class="cancel" id="cancelEditor">取消</button><button type="submit" class="save" id="saveNote">保存笔记 <span>↗</span></button></div></div></form></section></div><div class="image-lightbox" id="imageViewer" role="dialog" aria-modal="true" aria-label="查看笔记图片" hidden=""><div class="image-lightbox-backdrop" id="imageViewerBackdrop"></div><div class="image-lightbox-scroll"><img id="imageViewerImage" alt="笔记图片"/></div><div class="image-lightbox-controls"><button type="button" id="imageViewerZoom">放大</button><button type="button" id="imageViewerClose" aria-label="关闭图片">×</button></div></div><div class="account-layer" id="accountLayer" hidden=""><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle"><h2 id="accountTitle">登录 linote</h2><p id="accountDescription">用账号和密码同步你的笔记，账号名可以是中文。</p><div class="auth-tabs"><button type="button" id="authLoginTab" class="active">登录</button><button type="button" id="authRegisterTab">创建账号</button><button type="button" id="authLocalTab">仅本机使用</button></div><form id="accountForm"><label for="accountInput" id="accountInputLabel">账号</label><input id="accountInput" type="text" autoComplete="username" placeholder="输入账号名" maxLength="64" required=""/><div id="passwordRow"><label for="passwordInput">密码</label><input id="passwordInput" type="password" autoComplete="current-password" placeholder="输入密码（可留空）"/></div><small id="accountError"></small><button type="submit" id="authSubmit">登录</button></form><p class="account-warning" id="accountWarning">旧编号可作为账号名，首次使用请选择“创建账号”设置密码。请记住密码，目前无法找回。</p></section></div><div class="wechat-layer" id="wechatLayer" hidden=""><div class="wechat-backdrop" id="wechatBackdrop"></div><section class="wechat-dialog" role="dialog" aria-modal="true" aria-labelledby="wechatTitle"><header><h2 id="wechatTitle">微信接入</h2><button type="button" id="wechatClose" aria-label="关闭微信接入">×</button></header><p>一个 linote 账号可接入两个公众号。每个公众号使用各自的 URL 和 Token；在公众号后台选择“明文模式”和 XML。绑定后可连续发送文字，单独发送“以上”时合并保存为一篇笔记；单独发送“删除”可清空这段尚未保存的文字。</p><div id="wechatSetup" class="wechat-channels"></div><button type="button" id="wechatCreate">生成接入配置</button><div id="wechatMessage" role="status"></div></section></div><div class="insight-layer" id="insightLayer" hidden=""><div class="insight-backdrop" id="insightBackdrop"></div><section class="insight-dialog" id="insightDialog" role="dialog" aria-modal="true" aria-labelledby="insightTitle"><header class="insight-header"><h2 id="insightTitle">AI 洞察</h2><div><button type="button" id="insightHistoryButton">历史洞察</button><button type="button" id="insightSettingsButton">设置密钥</button><button type="button" id="insightClose" aria-label="关闭 AI 洞察">×</button></div></header><div class="insight-content"><section id="insightHome"><h3>选择一个视角，重新理解笔记</h3><div class="insight-scope"><span id="insightCount">0 条笔记</span><span id="insightRangeSummary">不限日期 · 全部话题</span><button type="button" id="insightRangeButton">修改范围</button></div><div class="insight-grid"><button class="insight-card" type="button" data-mode="themes"><span aria-hidden="true">▤</span><strong>主题延伸</strong><small>发现反复出现的主题与新问题</small></button><button class="insight-card" type="button" data-mode="friend"><span aria-hidden="true">◉</span><strong>朋友视角</strong><small>从旁观者角度重新看待自己</small></button><button class="insight-card" type="button" data-mode="tension"><span aria-hidden="true">≋</span><strong>主要矛盾</strong><small>找出笔记中相互拉扯的想法</small></button><button class="insight-card" type="button" data-mode="default"><span aria-hidden="true">✧</span><strong>默认洞察</strong><small>发现潜藏的思维模式与变化</small></button><button class="insight-card" type="button" data-mode="values"><span aria-hidden="true">⚖</span><strong>价值澄清</strong><small>看见选择背后真正重视的事</small></button><button class="insight-card" type="button" data-mode="reverse"><span aria-hidden="true">⇄</span><strong>逆向思考</strong><small>从反面检验熟悉的判断</small></button><button class="insight-card" type="button" data-mode="second"><span aria-hidden="true">↝</span><strong>二阶思考</strong><small>看看决定之后的连锁影响</small></button><button class="insight-card" type="button" data-mode="mbti"><span aria-hidden="true">◌</span><strong>MBTI 视角</strong><small>以性格偏好作为反思线索</small></button></div><div class="insight-custom"><label for="insightCustomPrompt">自由对话</label><textarea id="insightCustomPrompt" maxLength="1000" rows="4" placeholder="想聊聊这些笔记里的什么？例如：我最近反复在想什么？"></textarea><button type="button" id="insightCustomStart">开始对话</button></div><p class="insight-privacy">洞察时会将所选范围内的笔记发送给 DeepSeek。笔记较多时会分批分析；密钥加密保存在账号中。</p></section><section id="insightChat" hidden=""><button type="button" class="insight-back" id="insightChatBack">← 返回洞察</button><h3>自由对话</h3><p id="insightChatScope" class="insight-chat-scope"></p><div id="insightChatMessages" class="insight-chat-messages" aria-live="polite"></div><form id="insightChatForm" class="insight-chat-form"><textarea id="insightChatInput" maxLength="1000" rows="3" placeholder="继续提问…" aria-label="继续提问"></textarea><button type="submit" id="insightChatSend">发送</button></form></section><section id="insightRangePanel" hidden=""><button type="button" class="insight-back" id="insightRangeBack">← 返回洞察</button><h3>修改范围</h3><div class="range-field"><label for="insightDatePreset">日期范围</label><select id="insightDatePreset"><option value="last7">最近 7 天</option><option value="week">本周</option><option value="month">本月</option><option value="all" selected="">不限日期</option><option value="custom">自定义日期</option></select></div><div class="range-custom" id="insightCustomDates" hidden=""><label for="insightStartDate">开始日期</label><input id="insightStartDate" type="date"/><label for="insightEndDate">结束日期</label><input id="insightEndDate" type="date"/></div><div class="range-field"><label for="insightScope">话题范围</label><select id="insightScope" aria-label="话题范围"><option value="">全部话题</option></select></div><button type="button" class="range-apply" id="insightRangeApply">应用范围</button></section><section id="insightKeyPanel" hidden=""><h3>DeepSeek API 密钥</h3><p>密钥与你的 linote 账号关联，网页和 APK 登录同一账号后共用。</p><input id="insightKeyInput" type="password" autoComplete="off" placeholder="粘贴 DeepSeek API 密钥"/><div class="insight-key-actions"><button type="button" id="insightKeySave">保存到账号</button><button type="button" id="insightKeyClear">清除密钥</button><button type="button" class="plain" id="insightKeyBack">返回</button></div></section><section id="insightResult" hidden=""><button type="button" class="insight-back" id="insightResultBack">← 选择视角</button><h3 id="insightResultTitle"></h3><div id="insightResultMeta"></div><article id="insightResultBody"></article></section><section id="insightHistory" hidden=""><button type="button" class="insight-back" id="insightHistoryBack">← 返回洞察</button><h3>历史洞察</h3><div id="insightHistoryList"></div></section><div class="insight-message" id="insightMessage" role="status" aria-live="polite"></div></div></section></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script>(function(){setTimeout(function(){if(window.linoteReady)return;var box=document.createElement('div');box.style.cssText='position:fixed;z-index:100;left:12px;right:12px;bottom:12px;background:#fff;border:1px solid #c94b4b;border-radius:9px;padding:14px;color:#333;box-shadow:0 8px 25px #0002;font:14px sans-serif';box.textContent='linote 页面未正常启动。';var button=document.createElement('button');button.type='button';button.textContent='重试页面';button.style.cssText='margin-left:12px;border:0;border-radius:5px;background:#c94b4b;color:white;padding:7px 12px';button.onclick=function(){location.reload()};box.appendChild(button);document.body.appendChild(box)},4000)})()</script><script>(() => {
+</style><style>/* Shared appearance tokens cover the web shell, offline shell and Android assets. */
+html[data-theme],html[data-theme] body{background:var(--t-bg);color:var(--t-ink)}
+html[data-theme] body{accent-color:var(--t-accent-text)}
+html[data-theme] .sidebar{background:var(--t-sidebar);border-color:var(--t-line)}
+html[data-theme] :is(.topbar,.editor,.account-dialog,.wechat-dialog,.insight-header,.mini-stats,.calendar-toggle,.insight-card,.insight-custom,.insight-history-item,.range-field,.insight-chat-message,.ai-reasoning,.load-more){background:var(--t-paper);border-color:var(--t-line);color:var(--t-ink)}
+html[data-theme] :is(.note,.editor-footer){background:var(--t-paper);border-color:var(--t-line)}
+html[data-theme] .insight-dialog{background:var(--t-bg)}
+html[data-theme] :is(.brand strong,.crumb strong,.note-body,.ai-heading,.trash-title,#insightResultBody,.insight-card strong,.insight-custom label,.account-dialog label,.range-field){color:var(--t-ink)}
+html[data-theme] :is(.brand small,.nav-count,.topic-count,.section-heading,.topic-hint,.note-top,.note-actions button,.feed-heading span,.mini-stats-title,.mini-stats-title strong,.calendar-toggle small,.calendar-day-detail,.account-dialog p,.account-dialog .account-warning,.insight-scope,.insight-scope #insightRangeSummary,.insight-card small,.insight-privacy,.insight-chat-scope,#insightResultMeta,.insight-history-item span,.insight-header button,#insightKeyPanel p,.ai-reasoning,.trash-excerpt,.wechat-dialog p,.wechat-dialog label,.wechat-linked,.search,.search kbd,.editor-footer>span){color:var(--t-muted)}
+html[data-theme] .sidebar-bottom{border-color:var(--t-line)}
+html[data-theme] body .sidebar-bottom .account-name{color:var(--t-muted)}
+html[data-theme] body .sidebar-bottom button{color:var(--t-accent-text)}
+html[data-theme] :is(.nav-item,.topic-item){color:var(--t-ink)}
+html[data-theme] :is(.nav-item:hover,.topic-item:hover,.note-actions button:hover,.tag-suggestions button:hover,.calendar-toggle:hover,.calendar-toggle[aria-expanded="true"],.insight-card:hover,.insight-history-item:hover){background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] :is(.nav-item.active,.topic-item.active,.note-tags button,.selected-tag,.insight-chat-message.user,.wechat-code){background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] :is(.hash,.topic-item.active .hash,.section-heading button,.feed-heading button,.feed-heading #filterLabel,.inline-topic,.calendar-toggle>span,.insight-card>span,.insight-scope #insightRangeButton,.insight-back,.insight-key-actions .plain,.insight-chat-message strong,.ai-reasoning summary,.insight-history-delete,.load-more){color:var(--t-accent-text)}
+html[data-theme] .note-toggle{color:var(--t-accent-text)!important}
+html[data-theme] body .sidebar-tools button:hover,html[data-theme] body .sidebar-tools #trashButton.active{background:var(--t-soft);color:var(--t-accent-text);border-color:var(--t-line)}
+html[data-theme] .sidebar-tools #trashButton{border-color:var(--t-line)}
+html[data-theme] .feed-heading #filterLabel:disabled{color:var(--t-muted)}
+html[data-theme] :is(.new-button,.top-new,.empty button,.save,.mobile-fab,.account-dialog form button,.insight-custom button,.insight-key-actions button:not(.plain),.insight-chat-form button,.range-apply,.wechat-dialog>button,.wechat-dialog #wechatCodeButton,.wechat-channel .wechat-code-button){background:var(--t-accent);color:var(--t-on-accent);box-shadow:none}
+html[data-theme] :is(.new-button,.top-new,.empty button,.save,.account-dialog form button,.insight-custom button,.range-apply):hover{background:var(--t-accent-hover)}
+html[data-theme] :is(.search,.wechat-channel){background:var(--t-field);border-color:var(--t-line)}
+html[data-theme] :is(.account-dialog input,.insight-custom textarea,.insight-chat-form textarea,#insightKeyInput,.range-field select,.range-custom input,.wechat-dialog input,.wechat-copy-row button,.add-image){background:var(--t-field);border-color:var(--t-line);color:var(--t-ink)}
+html[data-theme] :is(.search:focus-within,.account-dialog input:focus,.insight-custom textarea:focus,.insight-chat-form textarea:focus,#insightKeyInput:focus){border-color:var(--t-accent-text)}
+html[data-theme] :is(input,textarea)::placeholder{color:var(--t-muted);opacity:.8}
+html[data-theme] :is(.add-image,.wechat-copy-row button,.cancel,.editor-header button){color:var(--t-accent-text)}
+html[data-theme] .cancel{background:var(--t-field);border-color:var(--t-line)}
+html[data-theme] :is(.cancel:hover,.editor-header button:hover){background:var(--t-soft)}
+html[data-theme] .note-tags button:hover{background:var(--t-soft);color:var(--t-accent-text)}
+html[data-theme] :is(.editor-header,.editor-footer,.auth-tabs,.insight-header){border-color:var(--t-line)}
+html[data-theme] .auth-tabs button{color:var(--t-muted)}
+html[data-theme] .auth-tabs button.active{color:var(--t-accent-text);border-color:var(--t-accent-text)}
+html[data-theme] :is(.account-dialog form small,#wechatMessage,.insight-message){color:var(--t-danger)}
+html[data-theme] .sync-status{color:var(--t-muted)}
+html[data-theme] .editor-writing .note-highlight{color:var(--t-ink)}
+html[data-theme] .editor-writing #noteBody{caret-color:var(--t-ink)}
+html[data-theme] .plain-long-note .editor-writing #noteBody{color:var(--t-ink)}
+html[data-theme] .calendar-cell{background:var(--t-line)}
+html[data-theme] .calendar-cell.level-1{background:color-mix(in srgb,var(--t-accent) 25%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-2{background:color-mix(in srgb,var(--t-accent) 50%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-3{background:color-mix(in srgb,var(--t-accent) 75%,var(--t-paper))}
+html[data-theme] .calendar-cell.level-4{background:var(--t-accent)}
+html[data-theme] .calendar-cell:focus-visible{outline-color:var(--t-accent-text)}
+html[data-theme] :is(.modal-backdrop,.insight-backdrop,.wechat-backdrop,.mobile-shade:not([hidden])){background:var(--t-overlay)}
+html[data-theme] .account-layer{background:var(--t-overlay)}
+html[data-theme] .toast{background:var(--t-ink);color:var(--t-paper)}
+html[data-theme] .note:hover{box-shadow:none}
+html[data-theme] button:focus-visible{outline:2px solid var(--t-accent-text);outline-offset:3px}
+/* Appearance sheet */
+.theme-open{overflow:hidden}
+.sidebar-tools #themeButton{grid-column:1/-1}
+.theme-layer{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;overscroll-behavior:contain}
+.theme-backdrop{position:absolute;inset:0;background:var(--t-overlay)}
+.theme-dialog{position:relative;width:min(640px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;border:1px solid var(--t-line);border-radius:20px;background:var(--t-paper);box-shadow:var(--t-shadow);overflow:hidden;color:var(--t-ink)}
+.theme-dialog header{display:flex;justify-content:space-between;align-items:center;padding:25px 28px 20px;border-bottom:1px solid var(--t-line);flex:none}
+.theme-dialog h2{margin:0;font-size:23px;letter-spacing:-.5px;font-weight:650}
+.theme-dialog header p{font-size:12px;color:var(--t-muted);margin:7px 0 0}
+.theme-dialog #themeClose{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;background:var(--t-field);color:var(--t-muted);font-size:26px;line-height:1}
+.theme-content{padding:23px 28px;overflow-y:auto;overscroll-behavior:contain}
+.theme-dialog fieldset{margin:0 0 24px;padding:0;border:0;min-width:0}
+.theme-dialog legend{padding:0;margin-bottom:12px;font-size:13px;font-weight:650}
+.theme-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:5px;border-radius:11px;background:var(--t-field)}
+.theme-modes button{border:1px solid transparent;border-radius:8px;padding:10px 4px;background:transparent;color:var(--t-muted);font-size:13px;white-space:nowrap}
+.theme-modes button[aria-pressed="true"]{background:var(--t-paper);border-color:var(--t-line);color:var(--t-accent-text);font-weight:650;box-shadow:0 2px 6px #00000008}
+.theme-palettes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.theme-palette{padding:5px;border:2px solid transparent;border-radius:12px;background:transparent;color:var(--t-ink);min-width:0;text-align:left}
+.theme-palette[aria-pressed="true"]{border-color:var(--t-accent-text);background:var(--t-soft)}
+.theme-sample{display:flex;height:64px;padding:8px;gap:7px;background:var(--sample-bg);border:1px solid var(--t-line);border-radius:7px;pointer-events:none}
+.theme-sample>i{width:12px;flex:none;background:var(--sample-accent);border-radius:3px;opacity:.85}
+.theme-sample>span{flex:1;min-width:0;padding:7px;background:var(--sample-paper);border-radius:4px}
+.theme-sample b,.theme-sample em{display:block;border-radius:2px;height:3px;margin-bottom:6px;background:var(--sample-ink);opacity:.32}
+.theme-sample b{width:45%;background:var(--sample-accent);opacity:1}.theme-sample em:last-child{width:65%}
+.theme-palette-label{display:flex;align-items:center;justify-content:space-between;padding:7px 3px 2px;font-size:12px}
+.theme-check{visibility:hidden;color:var(--t-accent-text);font-weight:bold}.theme-palette[aria-pressed="true"] .theme-check{visibility:visible}
+.theme-custom-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px;font-size:13px}
+.theme-custom-row label small{display:block;font-size:11px;color:var(--t-muted);margin-top:5px}
+.theme-color-input{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--t-line);border-radius:8px;background:var(--t-field)}
+.theme-color-input input[type="color"]{padding:0;width:28px;height:28px;border:0;background:transparent;cursor:pointer}
+.theme-color-input input[type="text"]{width:75px;padding:0;border:0;background:transparent;color:var(--t-ink);font:12px monospace;outline:0}
+.theme-custom-row output{color:var(--t-accent-text);font-size:12px}
+#themeTint{display:block;width:100%;margin:0;accent-color:var(--t-accent-text);touch-action:pan-x;height:24px}
+.theme-range-labels{display:flex;justify-content:space-between;color:var(--t-muted);font-size:10px;margin-top:3px}
+.theme-preview{background:var(--t-bg);border:1px solid var(--t-line);border-radius:12px;padding:17px}
+.theme-preview-card{padding:16px 18px;border:1px solid var(--t-line);border-radius:9px;background:var(--t-paper)}
+.theme-preview-card small{color:var(--t-muted);font-size:11px}.theme-preview-card p{font-size:14px;margin:10px 0 12px;line-height:1.7}
+.theme-preview-tag{background:var(--t-soft);color:var(--t-accent-text);border-radius:5px;padding:4px 7px;font-size:12px}
+.theme-dialog footer{border-top:1px solid var(--t-line);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex:none}
+.theme-dialog footer span{font-size:11px;color:var(--t-muted)}
+.theme-dialog footer button{border:0;background:transparent;color:var(--t-accent-text);font-size:12px;white-space:nowrap;padding:8px 0}
+@media(max-width:620px){.theme-layer{padding:12px}.theme-dialog{border-radius:15px;max-height:calc(100dvh - 24px)}.theme-dialog header{padding:20px}.theme-content{padding:20px}.theme-palettes{gap:5px}.theme-palette{padding:3px;border-radius:9px}.theme-sample{height:53px;padding:5px;gap:4px}.theme-sample>i{width:8px}.theme-sample>span{padding:6px 4px}.theme-dialog footer{padding:12px 20px}.theme-color-input{gap:4px}.theme-custom-row label small{max-width:180px;font-size:10px}.theme-palette-label{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.theme-dialog *{transition:none!important}}
+</style><script>(() => {
+  'use strict';
+  const KEY = 'linote.appearance.v1';
+  const defaults = {mode:'light', palette:'red', accent:null, tint:5};
+  const palettes = [
+    ['red','经典红','#c94b4b'], ['blue','雾蓝','#477ebd'],
+    ['green','森林','#368269'], ['violet','鸢尾','#8261ba'],
+    ['rose','玫瑰','#bc5682'], ['amber','琥珀','#a56b22'],
+    ['tea','奶茶','#95715b'], ['graphite','石墨','#687580'],
+  ];
+  const hex = value => typeof value === 'string' && /^#[\da-f]{6}$/i.test(value);
+  function normalize(value) {
+    value = value && typeof value === 'object' ? value : {};
+    return {mode:['light','dark','system'].includes(value.mode)?value.mode:defaults.mode,
+      palette:palettes.some(p=>p[0]===value.palette)?value.palette:defaults.palette,
+      accent:hex(value.accent)?value.accent:null,
+      tint:typeof value.tint==='number' && Number.isFinite(value.tint)?Math.min(20,Math.max(0,value.tint)):defaults.tint};
+  }
+  function read() { try { return normalize(JSON.parse(localStorage.getItem(KEY))); } catch { return {...defaults}; } }
+  let settings = read();
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const root = document.documentElement;
+  const rgb = color => [1,3,5].map(i=>parseInt(color.slice(i,i+2),16));
+  function mix(a,b,amount) {
+    const x=rgb(a), y=rgb(b);
+    return '#'+x.map((v,i)=>Math.round(v+(y[i]-v)*amount).toString(16).padStart(2,'0')).join('');
+  }
+  function luminance(color) { return rgb(color).map(v=>{v/=255; return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0); }
+  function contrast(a,b) { const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
+  function readable(color, surfaces, dark) {
+    const target=dark?'#ffffff':'#000000';
+    let result=color;
+    for(let n=0;n<=100 && surfaces.some(surface=>contrast(result,surface)<4.5);n++) result=mix(color,target,n/100);
+    return result;
+  }
+  function colors(palette, accent, dark, tint) {
+    const seed=accent || palettes.find(p=>p[0]===palette)[2];
+    const bg=mix(dark?'#141518':'#f7f7f8',seed,tint/100);
+    const paper=mix(dark?'#202125':'#ffffff',seed,tint/300);
+    const sidebar=mix(dark?'#191a1e':'#fcfcfc',seed,tint/220);
+    const ink=dark?'#eeeeef':'#29292e';
+    const muted=dark?'#aaaab4':'#707078';
+    const soft=mix(paper,seed,dark?.17:.08);
+    const accentText=readable(seed,[paper,bg,sidebar,soft],dark);
+    const button=mix(seed,dark?'#ffffff':'#000000',dark?.25:0);
+    const onAccent=contrast('#ffffff',button)>=contrast('#000000',button)?'#ffffff':'#000000';
+    return {'bg':bg,'paper':paper,'sidebar':sidebar,'ink':ink,'muted':muted,
+      'line':mix(paper,ink,dark?.14:.12),'soft':soft,
+      'field':mix(paper,ink,dark?.035:.025),'accent':button,'accent-text':accentText,
+      'accent-hover':mix(button,onAccent==='#ffffff'?'#000000':'#ffffff',.12),'on-accent':onAccent,
+      'danger':dark?'#ff999e':'#ad303c','overlay':dark?'#000000a8':'#17172266',
+      'shadow':dark?'0 20px 80px #0006':'0 20px 80px #24203018'};
+  }
+  let currentColors;
+  function systemDark() {
+    try { if(window.LinoteAppearance?.isSystemDark) return window.LinoteAppearance.isSystemDark(); } catch {}
+    return media.matches;
+  }
+  function apply() {
+    const dark=settings.mode==='dark' || (settings.mode==='system' && systemDark());
+    root.dataset.theme=dark?'dark':'light';
+    root.style.colorScheme=dark?'dark':'light';
+    currentColors=colors(settings.palette,settings.accent,dark,settings.tint);
+    for(const [key,value] of Object.entries(currentColors)) root.style.setProperty('--t-'+key,value);
+    // Retain the old variable names used by the note renderer.
+    for(const key of ['bg','paper','ink','muted','line','soft']) root.style.setProperty('--'+key,currentColors[key]);
+    root.style.setProperty('--green',currentColors.accent);
+    root.style.setProperty('--green-dark',currentColors['accent-hover']);
+    let meta=document.querySelector('meta[name="theme-color"]');
+    if(!meta) { meta=document.createElement('meta');meta.name='theme-color';document.head.append(meta); }
+    meta.content=currentColors.sidebar;
+    try { window.LinoteAppearance?.setTheme(currentColors.sidebar,dark); } catch {}
+    if(document.getElementById('themeLayer')) refreshControls();
+  }
+  function update(patch) {
+    settings=normalize({...settings,...patch});apply();
+    try { localStorage.setItem(KEY,JSON.stringify(settings));document.getElementById('themeSaveStatus').textContent='已保存到此设备 · 离线可用'; }
+    catch { document.getElementById('themeSaveStatus').textContent='当前已应用，但设备存储不可用，重开后可能需要重新选择'; }
+  }
+  function refreshControls() {
+    document.querySelectorAll('[data-theme-mode]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.themeMode===settings.mode)));
+    document.querySelectorAll('[data-theme-palette]').forEach(el=>{
+      el.setAttribute('aria-pressed',String(el.dataset.themePalette===settings.palette && !settings.accent));
+      const c=colors(el.dataset.themePalette,null,root.dataset.theme==='dark',settings.tint);
+      el.style.setProperty('--sample-bg',c.bg);el.style.setProperty('--sample-paper',c.paper);el.style.setProperty('--sample-accent',c.accent);el.style.setProperty('--sample-ink',c.muted);
+    });
+    const accent=settings.accent || palettes.find(p=>p[0]===settings.palette)[2];
+    document.getElementById('themeAccent').value=accent;
+    if(document.activeElement!==document.getElementById('themeHex')) document.getElementById('themeHex').value=accent.toUpperCase();
+    document.getElementById('themeTint').value=settings.tint;
+    document.getElementById('themeTintValue').textContent=settings.tint===0?'中性灰':Math.round(settings.tint/20*100)+'%';
+    document.getElementById('themePreviewName').textContent=(settings.accent?'自选颜色':palettes.find(p=>p[0]===settings.palette)[1])+' · '+(root.dataset.theme==='dark'?'深色':'浅色');
+  }
+  let previousFocus;
+  function close() {
+    const layer=document.getElementById('themeLayer');
+    if(!layer || layer.hidden) return false;
+    layer.hidden=true;document.body.classList.remove('theme-open');
+    previousFocus?.focus({preventScroll:true});return true;
+  }
+  function open() {
+    previousFocus=document.activeElement;
+    document.getElementById('sidebar').classList.remove('open');document.getElementById('mobileShade').hidden=true;
+    document.getElementById('themeLayer').hidden=false;document.body.classList.add('theme-open');
+    refreshControls();document.getElementById('themeClose').focus({preventScroll:true});
+  }
+  window.linoteTheme={close,isOpen:()=>!!document.getElementById('themeLayer') && !document.getElementById('themeLayer').hidden};
+  apply();
+  media.addEventListener('change',()=>{if(settings.mode==='system') apply();});
+  window.addEventListener('linote-system-theme',()=>{if(settings.mode==='system') apply();});
+  window.addEventListener('storage',event=>{if(event.key===KEY){settings=read();apply();}});
+  function init() {
+    const layer=document.createElement('div');layer.id='themeLayer';layer.className='theme-layer';layer.hidden=true;
+    layer.innerHTML=`<div class="theme-backdrop" id="themeBackdrop"></div><section class="theme-dialog" role="dialog" aria-modal="true" aria-labelledby="themeTitle"><header><div><h2 id="themeTitle">主题颜色</h2><p>让每一页，都有舒服的颜色。</p></div><button type="button" id="themeClose" aria-label="关闭主题颜色">×</button></header><div class="theme-content"><fieldset><legend>外观模式</legend><div class="theme-modes"><button type="button" data-theme-mode="light">☀ 浅色</button><button type="button" data-theme-mode="dark">☾ 深色</button><button type="button" data-theme-mode="system">◐ 跟随系统</button></div></fieldset><fieldset><legend>配色方案</legend><div class="theme-palettes">${palettes.map(p=>`<button type="button" class="theme-palette" data-theme-palette="${p[0]}" aria-pressed="false"><span class="theme-sample" aria-hidden="true"><i></i><span><b></b><em></em><em></em></span></span><span class="theme-palette-label">${p[1]}<span class="theme-check" aria-hidden="true">✓</span></span></button>`).join('')}</div></fieldset><fieldset><legend>自由调整</legend><div class="theme-custom-row"><label for="themeAccent">强调色<small>按钮、话题和选中状态</small></label><div class="theme-color-input"><input type="color" id="themeAccent" aria-label="自选强调色"><input type="text" id="themeHex" aria-label="强调色十六进制色值" maxlength="7" spellcheck="false"></div></div><div class="theme-custom-row"><label for="themeTint">背景染色<small>页面与笔记背景一起协调变化</small></label><output id="themeTintValue" for="themeTint"></output></div><input type="range" id="themeTint" min="0" max="20" step="1" aria-label="背景染色程度"><div class="theme-range-labels"><span>中性</span><span>浓郁</span></div></fieldset><div class="theme-preview"><div class="theme-preview-card"><small id="themePreviewName"></small><p>保卫个人史，记下每一个想法。</p><span class="theme-preview-tag">#此刻</span></div></div></div><footer><span id="themeSaveStatus" role="status">选择即生效 · 已保存到此设备</span><button type="button" id="themeReset">恢复默认</button></footer></section>`;
+    document.body.append(layer);
+    document.getElementById('themeButton')?.addEventListener('click',open);
+    document.getElementById('themeClose').addEventListener('click',close);
+    document.getElementById('themeBackdrop').addEventListener('click',close);
+    layer.querySelectorAll('[data-theme-mode]').forEach(el=>el.addEventListener('click',()=>update({mode:el.dataset.themeMode})));
+    layer.querySelectorAll('[data-theme-palette]').forEach(el=>el.addEventListener('click',()=>update({palette:el.dataset.themePalette,accent:null})));
+    document.getElementById('themeAccent').addEventListener('input',event=>update({accent:event.target.value}));
+    const input=document.getElementById('themeHex');
+    input.addEventListener('input',()=>{if(hex(input.value)) update({accent:input.value});});
+    input.addEventListener('blur',()=>{input.value=(settings.accent || palettes.find(p=>p[0]===settings.palette)[2]).toUpperCase();});
+    document.getElementById('themeTint').addEventListener('input',event=>update({tint:Number(event.target.value)}));
+    document.getElementById('themeReset').addEventListener('click',()=>update({...defaults}));
+    layer.addEventListener('keydown',event=>{
+      if(event.key!=='Tab') return;
+      const items=[...layer.querySelectorAll('button,input')].filter(el=>!el.disabled);
+      const first=items[0],last=items.at(-1);
+      if(event.shiftKey && document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey && document.activeElement===last){event.preventDefault();first.focus();}
+    });
+    refreshControls();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script><div class="app-shell"><div class="mobile-shade" id="mobileShade" hidden=""></div><aside class="sidebar" id="sidebar"><div class="brand"><div><strong>linote</strong><small>保卫个人史</small></div></div><button class="new-button" id="newNoteSidebar" type="button"><span aria-hidden="true">＋</span> 写一条笔记 <kbd>N</kbd></button><button class="calendar-toggle" id="calendarToggle" type="button" aria-expanded="false"><span>▦</span> 每日记录 <small id="todayCount">今日 0 条</small></button><div class="mini-stats" id="calendarPanel" hidden=""><div class="mini-stats-title"><span>近 35 天</span><strong id="totalStats">共 0 条笔记</strong></div><div class="mini-calendar" id="miniCalendar" aria-label="最近 35 天笔记数量"></div><div class="calendar-day-detail" id="calendarDayDetail">点选日期查看笔记数量</div></div><div class="side-section"><button class="nav-item active" id="allNotes" type="button"><span class="nav-icon">▦</span><span>全部笔记</span><span class="nav-count" id="allCount">0</span></button><button class="nav-item" id="reviewNotes" type="button"><span class="nav-icon">↻</span><span>回顾</span><span class="nav-count">10</span></button><button class="nav-item" id="insightButton" type="button"><span class="nav-icon">✧</span><span>洞察</span></button></div><div class="side-section topic-section"><div class="section-heading"><span>话题</span><button type="button" id="sortButton" title="切换话题排序" aria-label="切换话题排序">笔记数 ↓</button></div><div class="topic-list" id="topicList"></div><p class="topic-hint" id="topicHint">添加话题后，会自动出现在这里。</p></div><div class="sidebar-bottom"><span class="account-name" id="accountName">未登录</span><div class="sidebar-tools"><button type="button" id="switchAccount">切换账号</button><button type="button" id="checkUpdate">检查更新</button><button type="button" id="exportButton">导出</button><button type="button" id="importFlomoButton">导入</button><button type="button" id="themeButton">主题颜色</button><button type="button" class="web-only" id="wechatButton">微信接入</button><button type="button" id="trashButton">回收站 <span id="trashCount"></span></button></div><input id="importFlomoFile" type="file" accept=".html,text/html" aria-label="选择 flomo 导出文件" hidden=""/></div></aside><main class="main"><header class="topbar"><button class="mobile-menu" type="button" id="mobileMenu" aria-label="打开菜单">☰</button><div class="crumb"><strong id="pageTitle">全部笔记</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus" aria-live="polite"></span><label class="search"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索笔记或话题" aria-label="搜索笔记或话题"/><kbd>Ctrl K</kbd></label><button class="top-new" id="newNoteTop" type="button">＋ <span>新笔记</span></button></div></header><div class="content"><div class="feed-heading"><div><strong id="resultCount">0 条笔记</strong><button type="button" id="filterLabel" aria-label="切换笔记排序">按最近编辑排序 ▾</button></div><div class="feed-actions"><button type="button" id="reviewAgain" hidden="">换一组 ↻</button><button type="button" id="clearFilter" hidden="">清除筛选 ×</button><button type="button" id="collapseAll" aria-label="展开全部笔记">全部展开</button></div></div><section class="notes" id="notes" aria-live="polite"></section><button type="button" class="load-more" id="loadMore" hidden="">加载更多笔记</button><section class="empty" id="empty"><button type="button" id="emptyNew">写一条笔记 <span>↗</span></button></section></div><button class="mobile-fab" id="mobileFab" type="button" aria-label="写一条笔记">＋</button></main></div><div class="modal-layer" id="modalLayer" hidden=""><div class="modal-backdrop" id="modalBackdrop"></div><section class="editor" role="dialog" aria-modal="true" aria-labelledby="editorTitle"><div class="editor-header"><h2 id="editorTitle">写一条笔记</h2><button type="button" id="closeEditor" aria-label="关闭编辑器">×</button></div><form id="noteForm"><div class="editor-writing"><div id="noteHighlight" class="note-highlight" aria-hidden="true"></div><textarea id="noteBody" placeholder="现在的想法是… 在正文中输入 #话题" maxLength="20000" spellCheck="false" data-gramm="false"></textarea></div><div class="editor-images" id="editorImages"></div><div class="editor-footer"><button type="button" class="add-image" id="addImage">＋ 图片</button><input id="imageInput" type="file" accept="image/*" multiple="" hidden=""/><span id="editorHint">保存后同步到当前账号</span><div><button type="button" class="cancel" id="cancelEditor">取消</button><button type="submit" class="save" id="saveNote">保存笔记 <span>↗</span></button></div></div></form></section></div><div class="image-lightbox" id="imageViewer" role="dialog" aria-modal="true" aria-label="查看笔记图片" hidden=""><div class="image-lightbox-backdrop" id="imageViewerBackdrop"></div><div class="image-lightbox-scroll"><img id="imageViewerImage" alt="笔记图片"/></div><div class="image-lightbox-controls"><button type="button" id="imageViewerZoom">放大</button><button type="button" id="imageViewerClose" aria-label="关闭图片">×</button></div></div><div class="account-layer" id="accountLayer" hidden=""><section class="account-dialog" role="dialog" aria-modal="true" aria-labelledby="accountTitle"><h2 id="accountTitle">登录 linote</h2><p id="accountDescription">用账号和密码同步你的笔记，账号名可以是中文。</p><div class="auth-tabs"><button type="button" id="authLoginTab" class="active">登录</button><button type="button" id="authRegisterTab">创建账号</button><button type="button" id="authLocalTab">仅本机使用</button></div><form id="accountForm"><label for="accountInput" id="accountInputLabel">账号</label><input id="accountInput" type="text" autoComplete="username" placeholder="输入账号名" maxLength="64" required=""/><div id="passwordRow"><label for="passwordInput">密码</label><input id="passwordInput" type="password" autoComplete="current-password" placeholder="输入密码（可留空）"/></div><small id="accountError"></small><button type="submit" id="authSubmit">登录</button></form><p class="account-warning" id="accountWarning">旧编号可作为账号名，首次使用请选择“创建账号”设置密码。请记住密码，目前无法找回。</p></section></div><div class="wechat-layer" id="wechatLayer" hidden=""><div class="wechat-backdrop" id="wechatBackdrop"></div><section class="wechat-dialog" role="dialog" aria-modal="true" aria-labelledby="wechatTitle"><header><h2 id="wechatTitle">微信接入</h2><button type="button" id="wechatClose" aria-label="关闭微信接入">×</button></header><p>一个 linote 账号可接入两个公众号。每个公众号使用各自的 URL 和 Token；在公众号后台选择“明文模式”和 XML。绑定后可连续发送文字，单独发送“以上”时合并保存为一篇笔记；单独发送“删除”可清空这段尚未保存的文字。</p><div id="wechatSetup" class="wechat-channels"></div><button type="button" id="wechatCreate">生成接入配置</button><div id="wechatMessage" role="status"></div></section></div><div class="insight-layer" id="insightLayer" hidden=""><div class="insight-backdrop" id="insightBackdrop"></div><section class="insight-dialog" id="insightDialog" role="dialog" aria-modal="true" aria-labelledby="insightTitle"><header class="insight-header"><h2 id="insightTitle">AI 洞察</h2><div><button type="button" id="insightHistoryButton">历史洞察</button><button type="button" id="insightSettingsButton">设置密钥</button><button type="button" id="insightClose" aria-label="关闭 AI 洞察">×</button></div></header><div class="insight-content"><section id="insightHome"><h3>选择一个视角，重新理解笔记</h3><div class="insight-scope"><span id="insightCount">0 条笔记</span><span id="insightRangeSummary">不限日期 · 全部话题</span><button type="button" id="insightRangeButton">修改范围</button></div><div class="insight-grid"><button class="insight-card" type="button" data-mode="themes"><span aria-hidden="true">▤</span><strong>主题延伸</strong><small>发现反复出现的主题与新问题</small></button><button class="insight-card" type="button" data-mode="friend"><span aria-hidden="true">◉</span><strong>朋友视角</strong><small>从旁观者角度重新看待自己</small></button><button class="insight-card" type="button" data-mode="tension"><span aria-hidden="true">≋</span><strong>主要矛盾</strong><small>找出笔记中相互拉扯的想法</small></button><button class="insight-card" type="button" data-mode="default"><span aria-hidden="true">✧</span><strong>默认洞察</strong><small>发现潜藏的思维模式与变化</small></button><button class="insight-card" type="button" data-mode="values"><span aria-hidden="true">⚖</span><strong>价值澄清</strong><small>看见选择背后真正重视的事</small></button><button class="insight-card" type="button" data-mode="reverse"><span aria-hidden="true">⇄</span><strong>逆向思考</strong><small>从反面检验熟悉的判断</small></button><button class="insight-card" type="button" data-mode="second"><span aria-hidden="true">↝</span><strong>二阶思考</strong><small>看看决定之后的连锁影响</small></button><button class="insight-card" type="button" data-mode="mbti"><span aria-hidden="true">◌</span><strong>MBTI 视角</strong><small>以性格偏好作为反思线索</small></button></div><div class="insight-custom"><label for="insightCustomPrompt">自由对话</label><textarea id="insightCustomPrompt" maxLength="1000" rows="4" placeholder="想聊聊这些笔记里的什么？例如：我最近反复在想什么？"></textarea><button type="button" id="insightCustomStart">开始对话</button></div><p class="insight-privacy">洞察时会将所选范围内的笔记发送给 DeepSeek。笔记较多时会分批分析；密钥加密保存在账号中。</p></section><section id="insightChat" hidden=""><button type="button" class="insight-back" id="insightChatBack">← 返回洞察</button><h3>自由对话</h3><p id="insightChatScope" class="insight-chat-scope"></p><div id="insightChatMessages" class="insight-chat-messages" aria-live="polite"></div><form id="insightChatForm" class="insight-chat-form"><textarea id="insightChatInput" maxLength="1000" rows="3" placeholder="继续提问…" aria-label="继续提问"></textarea><button type="submit" id="insightChatSend">发送</button></form></section><section id="insightRangePanel" hidden=""><button type="button" class="insight-back" id="insightRangeBack">← 返回洞察</button><h3>修改范围</h3><div class="range-field"><label for="insightDatePreset">日期范围</label><select id="insightDatePreset"><option value="last7">最近 7 天</option><option value="week">本周</option><option value="month">本月</option><option value="all" selected="">不限日期</option><option value="custom">自定义日期</option></select></div><div class="range-custom" id="insightCustomDates" hidden=""><label for="insightStartDate">开始日期</label><input id="insightStartDate" type="date"/><label for="insightEndDate">结束日期</label><input id="insightEndDate" type="date"/></div><div class="range-field"><label for="insightScope">话题范围</label><select id="insightScope" aria-label="话题范围"><option value="">全部话题</option></select></div><button type="button" class="range-apply" id="insightRangeApply">应用范围</button></section><section id="insightKeyPanel" hidden=""><h3>DeepSeek API 密钥</h3><p>密钥与你的 linote 账号关联，网页和 APK 登录同一账号后共用。</p><input id="insightKeyInput" type="password" autoComplete="off" placeholder="粘贴 DeepSeek API 密钥"/><div class="insight-key-actions"><button type="button" id="insightKeySave">保存到账号</button><button type="button" id="insightKeyClear">清除密钥</button><button type="button" class="plain" id="insightKeyBack">返回</button></div></section><section id="insightResult" hidden=""><button type="button" class="insight-back" id="insightResultBack">← 选择视角</button><h3 id="insightResultTitle"></h3><div id="insightResultMeta"></div><article id="insightResultBody"></article></section><section id="insightHistory" hidden=""><button type="button" class="insight-back" id="insightHistoryBack">← 返回洞察</button><h3>历史洞察</h3><div id="insightHistoryList"></div></section><div class="insight-message" id="insightMessage" role="status" aria-live="polite"></div></div></section></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script>(function(){setTimeout(function(){if(window.linoteReady)return;var box=document.createElement('div');box.style.cssText='position:fixed;z-index:100;left:12px;right:12px;bottom:12px;background:#fff;border:1px solid #c94b4b;border-radius:9px;padding:14px;color:#333;box-shadow:0 8px 25px #0002;font:14px sans-serif';box.textContent='linote 页面未正常启动。';var button=document.createElement('button');button.type='button';button.textContent='重试页面';button.style.cssText='margin-left:12px;border:0;border-radius:5px;background:#c94b4b;color:white;padding:7px 12px';button.onclick=function(){location.reload()};box.appendChild(button);document.body.appendChild(box)},4000)})()</script><script>(() => {
   'use strict';
   document.body.classList.toggle('linote-android', /LinoteAndroid\/\d+/.test(navigator.userAgent));
   const KEY = 'linote.notes.v1';
@@ -85,7 +314,7 @@ body.linote-android .web-only{display:none!important}
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.27';
+  const APP_VERSION = '1.28';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
@@ -1125,6 +1354,7 @@ body.linote-android .web-only{display:none!important}
   $('mobileShade').addEventListener('touchstart',closeSidebar,{passive:true});
   document.addEventListener('pointerdown',e => { if ($('sidebar').classList.contains('open') && !$('sidebar').contains(e.target) && !$('mobileMenu').contains(e.target)) closeSidebar(); },true);
   function navigateBack() {
+    if (window.linoteTheme?.close()) return true;
     if (!$('imageViewer').hidden) { closeImageViewer(); return true; }
     if (!$('modalLayer').hidden) { closeEditor(); return true; }
     if (!$('wechatLayer').hidden) { closeWechat(); return true; }
@@ -1148,6 +1378,7 @@ body.linote-android .web-only{display:none!important}
     return true;
   };
   function canSwipeOpen(event) {
+    if (window.linoteTheme?.isOpen()) return false;
     return matchMedia('(max-width:620px)').matches && (
       !$('modalLayer').hidden || !$('insightLayer').hidden || $('sidebar').classList.contains('open') ||
       ($('accountLayer').hidden && !event.target.closest('input,textarea,select'))
@@ -1159,6 +1390,7 @@ body.linote-android .web-only{display:none!important}
     return dx > 56 && dx > Math.abs(dy) * 1.3;
   }
   window.linoteHandleSwipe = () => {
+    if (window.linoteTheme?.isOpen()) return;
     if (!matchMedia('(max-width:620px)').matches) return;
     if (Date.now() - lastSwipeAt < 700) return;
     lastSwipeAt = Date.now();
@@ -1232,7 +1464,7 @@ body.linote-android .web-only{display:none!important}
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') navigateBack();
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('searchInput').focus(); }
-    if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
+    if (e.key.toLowerCase() === 'n' && !window.linoteTheme?.isOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
   if ('serviceWorker' in navigator) {

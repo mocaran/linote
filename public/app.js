@@ -8,7 +8,7 @@
   const INSIGHT_KEY = 'linote.deepseek-key.v1.';
   const DRAFT_KEY = 'linote.drafts.v1.';
   const OFFLINE_DB = 'linote-offline-v1';
-  const APP_VERSION = '1.27';
+  const APP_VERSION = '1.28';
   const $ = id => document.getElementById(id);
   const state = { notes: [], trash: [], view: 'notes', account: null, authMode: 'login', tag: null, reviewIds: null, search: '', sort: 'desc', noteSort: 'updated', visibleCount: 30, noteOpen: new Map(), localImageUrls: new Map(), uploadedImages: new Set(), allExpanded: false, editing: null, draftTags: [], draftImages: [], insightHasKey: false, chatMessages: [], chatScope: '' };
   let toastTimer, draftTimer;
@@ -1048,6 +1048,7 @@
   $('mobileShade').addEventListener('touchstart',closeSidebar,{passive:true});
   document.addEventListener('pointerdown',e => { if ($('sidebar').classList.contains('open') && !$('sidebar').contains(e.target) && !$('mobileMenu').contains(e.target)) closeSidebar(); },true);
   function navigateBack() {
+    if (window.linoteTheme?.close()) return true;
     if (!$('imageViewer').hidden) { closeImageViewer(); return true; }
     if (!$('modalLayer').hidden) { closeEditor(); return true; }
     if (!$('wechatLayer').hidden) { closeWechat(); return true; }
@@ -1071,6 +1072,7 @@
     return true;
   };
   function canSwipeOpen(event) {
+    if (window.linoteTheme?.isOpen()) return false;
     return matchMedia('(max-width:620px)').matches && (
       !$('modalLayer').hidden || !$('insightLayer').hidden || $('sidebar').classList.contains('open') ||
       ($('accountLayer').hidden && !event.target.closest('input,textarea,select'))
@@ -1082,6 +1084,7 @@
     return dx > 56 && dx > Math.abs(dy) * 1.3;
   }
   window.linoteHandleSwipe = () => {
+    if (window.linoteTheme?.isOpen()) return;
     if (!matchMedia('(max-width:620px)').matches) return;
     if (Date.now() - lastSwipeAt < 700) return;
     lastSwipeAt = Date.now();
@@ -1155,7 +1158,7 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') navigateBack();
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); $('searchInput').focus(); }
-    if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
+    if (e.key.toLowerCase() === 'n' && !window.linoteTheme?.isOpen() && !e.ctrlKey && !e.metaKey && !e.altKey && $('modalLayer').hidden && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); openEditor(); }
   });
   render();
   if ('serviceWorker' in navigator) {
