@@ -1173,11 +1173,17 @@
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   }
+  const standalone = document.body.classList.contains('linote-standalone');
+  if (standalone) {
+    for (const id of ['authLoginTab', 'authRegisterTab', 'checkUpdate', 'importFlomoButton', 'exportButton', 'insightButton', 'wechatButton']) {
+      $(id).style.display = 'none';
+    }
+  }
   async function startApp() {
     const remembered = await rememberedAccount();
     if (remembered) { state.account=remembered; $('accountName').textContent=accountLabel(remembered); state.notes=await cachedNotes(remembered); state.trash=await cachedTrash(remembered); const localItems=[...state.notes,...state.trash.filter(entry=>entry.kind==='note').map(entry=>entry.item)]; await hydrateLocalImages(localItems); render(); if (navigator.onLine && !isLocalAccount(remembered)) void cacheRemoteImages(localItems,remembered); }
     if (isLocalAccount()) return;
-    if (!remembered && document.body.classList.contains('linote-android')) { openAccount('local'); return; }
+    if (standalone || (!remembered && document.body.classList.contains('linote-android'))) { openAccount('local'); return; }
     if (!navigator.onLine) { if (!remembered) openAccount('local'); else toast('离线模式 · 可继续编辑，联网后同步'); return; }
     try {
       const response = await fetch('/api/auth',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(12000)});
