@@ -60,11 +60,32 @@ powershell -File android/build-apk.ps1 -Standalone
 
 > ⚠️ 当前脚本使用仓库内的 `android/debug.keystore` 签名。debug key 是公开可得的通用密钥，任何人都能用同名同签名的 APK 伪装成这个应用的更新，**不适合作为正式分发签名**；对外发布请改用自己生成的 release keystore。
 
-## 已知限制
+## 两个变体与权限
 
-- `检查更新` 会请求版本清单并下载 APK，但 Android 清单**没有声明 `INTERNET` 权限**（应用本身完全离线），因此这条链路在当前版本不可用。
-- 应用内没有任何权限声明，也就无法联网；这是「离线优先」的取舍，不是遗漏。
+`android/build-apk.ps1` 用同一份源码产出两个 APK：
+
+| 变体 | 命令 | 包名 | 权限 |
+| --- | --- | --- | --- |
+| 单机版 | `-Standalone` | `chatgpt.site.linote.standalone` | **无**：脚本会主动移除全部 `uses-permission` |
+| 联网版 | 默认 | `chatgpt.site.linote` | `INTERNET`、`REQUEST_INSTALL_PACKAGES` |
+
+单机版的界面点击「导出 / 导入 / 洞察 / 微信接入」只会提示不可用，这是设计如此：这几项依赖后端。
+
+## 签名
+
+`build-apk.ps1` 优先使用私有 release key，找不到才退回调试签名并给出警告。
+
+1. 生成密钥（只需一次，**不要放进仓库**）：
+
+   ```powershell
+   keytool -genkeypair -keystore "$env:USERPROFILE\.android-keys\linote-release.jks" `
+     -alias linote-release -keyalg RSA -keysize 4096 -validity 10000
+   ```
+
+2. 复制 `android/keystore.properties.example` 为 `android/keystore.properties` 并填入密码（该文件已被 `.gitignore` 忽略）；也可以用环境变量 `LINOTE_KEYSTORE` / `LINOTE_KEYSTORE_PASSWORD` / `LINOTE_KEY_ALIAS` / `LINOTE_KEY_PASSWORD`。
+
+> ⚠️ 不要用调试签名对外发布：debug key 是公开的通用密钥，任何人都能签出「同名同签名」的 APK 冒充本应用的更新。更换发布签名后，已安装旧包的设备需要先卸载再安装。
 
 ## License
 
-尚未添加开源许可证文件。若要允许他人自由使用 / 修改 / 分发，建议补充 MIT 或 Apache-2.0。
+本项目以 [MIT](LICENSE) 许可发布。

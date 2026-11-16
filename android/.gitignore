@@ -5,3 +5,7 @@ local.properties
 debug.keystore
 linote.apk
 *.idsig
+
+/linote-standalone.apk
+keystore.properties
+*.jks
