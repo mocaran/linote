@@ -179,7 +179,13 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if ("linote".equals(uri.getScheme()) && "update".equals(uri.getHost())) {
-                    checkForUpdate();
+                    // 单机版是刻意断网的（清单里没有 INTERNET 权限），检查更新必然失败，这里直接说明。
+                    if (MainActivity.this.getPackageName().endsWith(".standalone")) {
+                        Toast.makeText(MainActivity.this, "单机版不会联网检查更新，请从 GitHub Releases 手动下载新版",
+                            Toast.LENGTH_LONG).show();
+                    } else {
+                        checkForUpdate();
+                    }
                     return true;
                 }
                 if ("https".equals(uri.getScheme()) && HOST.equals(uri.getHost())) return false;
